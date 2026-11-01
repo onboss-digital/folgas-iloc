@@ -36,10 +36,17 @@ export function CompartilharEscalaModal({
 
   const isPublishedAndActive = schedule.isPublished && schedule.isPublicShareEnabled;
 
-  // URL pública completa
+  // Identificador exclusivo do link público (token prioritário ou weekId)
+  const tokenParam = schedule.shareToken || schedule.weekId;
+
+  // URL pública completa e auditável
   const shareUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/escala-publica`
-    : 'http://localhost:3000/escala-publica';
+    ? (tokenParam
+        ? `${window.location.origin}/escala-publica?token=${encodeURIComponent(tokenParam)}`
+        : `${window.location.origin}/escala-publica`)
+    : (tokenParam
+        ? `http://localhost:3000/escala-publica?token=${encodeURIComponent(tokenParam)}`
+        : 'http://localhost:3000/escala-publica');
 
   const handleCopyLink = () => {
     if (!isPublishedAndActive) return;

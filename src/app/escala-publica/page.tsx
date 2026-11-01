@@ -17,7 +17,8 @@ import {
   getEmployeeDayHours,
 } from '../../lib/scheduleEngine';
 import { getWeekDisplayHeader } from '../../components/escala/GerenciarEscalasTab';
-import { fetchPublicScheduleByToken } from '../../lib/supabase';
+import { fetchPublicScheduleByToken, fetchLatestPublishedScheduleFromSupabase } from '../../lib/supabase';
+import { getTodayStrBrasilia } from '../../lib/dateUtils';
 
 function EscalaPublicaContent() {
   const searchParams = useSearchParams();
@@ -40,64 +41,110 @@ function EscalaPublicaContent() {
   const [notFound, setNotFound] = useState<boolean>(false);
 
   const startDateStr = schedule.startDate || '2026-10-26';
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayStrBrasilia();
   const days: DayInfo[] = getWeekDays(startDateStr, todayStr);
   const weekHeader = getWeekDisplayHeader(days);
 
   useEffect(() => {
     const loadSchedule = async () => {
       setIsLoading(true);
+      let resolvedSchedule: WeekSchedule | null = null;
+      let resolvedEmployees: Employee[] = [];
 
-      // 1. Se houver token na URL, consulta no banco de dados na nuvem
+      // 1. Se houver token na URL, consulta a escala específica no banco de dados na nuvem
       if (token) {
         try {
           const { schedule: cloudSched, employees: cloudEmps } = await fetchPublicScheduleByToken(token);
           if (cloudSched) {
-            setSchedule(cloudSched);
+            resolvedSchedule = cloudSched;
             if (cloudEmps && cloudEmps.length > 0) {
-              setEmployees(cloudEmps);
+              resolvedEmployees = cloudEmps;
             }
-            setIsLoading(false);
-            return;
           }
-        } catch {
-          // Continua para fallback local
+        } catch (err) {
+          console.warn('Aviso ao consultar escala por token na nuvem:', err);
         }
       }
 
-      // 2. Fallback para dados locais
-      try {
-        const savedSchedule = localStorage.getItem('iloc_schedule');
-        const savedMap = localStorage.getItem('iloc_schedules_map');
-        const savedEmployees = localStorage.getItem('iloc_employees');
-
-        if (savedSchedule) {
-          const parsed = JSON.parse(savedSchedule);
-          if (parsed.isPublished && parsed.isPublicShareEnabled) {
-            setSchedule(parsed);
+      // 2. Se não houver token ou se a busca por token falhar, busca a escala publicada mais recente na nuvem
+      if (!resolvedSchedule) {
+        try {
+          const { schedule: latestCloudSched, employees: latestCloudEmps } = await fetchLatestPublishedScheduleFromSupabase();
+          if (latestCloudSched) {
+            resolvedSchedule = latestCloudSched;
+            if (latestCloudEmps && latestCloudEmps.length > 0) {
+              resolvedEmployees = latestCloudEmps;
+            }
           }
-        } else if (savedMap) {
-          const parsedMap = JSON.parse(savedMap);
-          const firstPublished = Object.values(parsedMap).find(
-            (s: any) => s.isPublished && s.isPublicShareEnabled
-          ) as WeekSchedule | undefined;
-          if (firstPublished) {
-            setSchedule(firstPublished);
-          }
+        } catch (err) {
+          console.warn('Aviso ao consultar última escala na nuvem:', err);
         }
+      }
 
-        if (savedEmployees) {
-          setEmployees(JSON.parse(savedEmployees));
+      // 3. Fallback para dados locais do navegador (quando operando offline ou mesmo ambiente)
+      if (!resolvedSchedule) {
+        try {
+          const savedMap = localStorage.getItem('iloc_schedules_map');
+          const savedSchedule = localStorage.getItem('iloc_schedule');
+
+          if (savedMap) {
+            const parsedMap: Record<string, WeekSchedule> = JSON.parse(savedMap);
+            if (token) {
+              const matched = Object.values(parsedMap).find(
+                s => (s.shareToken === token || s.weekId === token) && s.isPublished && s.isPublicShareEnabled
+              );
+              if (matched) resolvedSchedule = matched;
+            }
+            if (!resolvedSchedule) {
+              const anyPublished = Object.values(parsedMap).find(
+                s => s.isPublished && s.isPublicShareEnabled
+              );
+              if (anyPublished) resolvedSchedule = anyPublished;
+            }
+          }
+
+          if (!resolvedSchedule && savedSchedule) {
+            const parsed = JSON.parse(savedSchedule);
+            if (parsed.isPublished && parsed.isPublicShareEnabled) {
+              resolvedSchedule = parsed;
+            }
+          }
+        } catch (err) {
+          console.warn('Aviso ao ler armazenamento local:', err);
         }
-      } catch {
+      }
+
+      // 4. Carrega colaboradores locais se a nuvem não tiver retornado
+      if (resolvedEmployees.length === 0) {
+        try {
+          const savedEmployees = localStorage.getItem('iloc_employees');
+          if (savedEmployees) {
+            resolvedEmployees = JSON.parse(savedEmployees);
+          }
+        } catch {}
+      }
+
+      // 5. Finaliza estado
+      if (resolvedSchedule && resolvedSchedule.isPublished && resolvedSchedule.isPublicShareEnabled) {
+        setSchedule(resolvedSchedule);
+        setEmployees(resolvedEmployees);
+        setNotFound(false);
+
+        // Ajusta dia selecionado para o dia de hoje da escala carregada
+        const schedDays = getWeekDays(resolvedSchedule.startDate, todayStr);
+        const todayIdx = schedDays.findIndex(d => d.isToday);
+        if (todayIdx !== -1) {
+          setSelectedDayIdx(todayIdx);
+        }
+      } else {
         setNotFound(true);
-      } finally {
-        setIsLoading(false);
       }
+
+      setIsLoading(false);
     };
 
     loadSchedule();
-  }, [token]);
+  }, [token, todayStr]);
 
   const activeEmployees = employees.filter(e => e.status === 'active');
   const selectedDay = days[selectedDayIdx] || days[0];

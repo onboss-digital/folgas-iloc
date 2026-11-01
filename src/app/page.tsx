@@ -238,9 +238,8 @@ export default function Home() {
     setSchedulesMap(updatedMap);
     try {
       localStorage.setItem('iloc_schedules_map', JSON.stringify(updatedMap));
-      if (newSchedule.weekId === '2026-W44') {
-        localStorage.setItem('iloc_schedule', JSON.stringify(newSchedule));
-      }
+      // Garante que a escala ativa/publicada seja gravada para acesso direto
+      localStorage.setItem('iloc_schedule', JSON.stringify(newSchedule));
     } catch {}
 
     // Sincronização em nuvem quando Supabase estiver disponível
@@ -399,14 +398,14 @@ export default function Home() {
       showToast(`Atenção: Os dias ${names} estão abaixo do mínimo de ${settings.minStaffPerDay} pessoas.`, 'warning');
     }
 
-    const generatedToken = `escala-semana-${newSchedule.weekNumber}-${Date.now().toString(36)}`;
+    const generatedToken = newSchedule.shareToken || `escala-semana-${newSchedule.weekNumber}-${Date.now().toString(36)}`;
 
     const updatedSchedule: WeekSchedule = {
       ...newSchedule,
       isPublished: true,
       isPublicShareEnabled: true,
       shareToken: generatedToken,
-      publishedAt: new Date().toISOString(),
+      publishedAt: getNowIsoBrasilia(),
     };
     persistSchedule(updatedSchedule);
     showToast('Escala publicada com sucesso! Link exclusivo gerado.', 'success');

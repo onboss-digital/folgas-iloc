@@ -385,7 +385,7 @@ export async function fetchPublicScheduleByToken(token: string): Promise<{
     const { data: schedData, error: schedErr } = await supabase
       .from('schedules')
       .select('*')
-      .eq('share_token', token)
+      .or(`share_token.eq.${token},week_id.eq.${token}`)
       .eq('is_published', true)
       .eq('is_public_share_enabled', true)
       .maybeSingle();
@@ -434,6 +434,73 @@ export async function fetchPublicScheduleByToken(token: string): Promise<{
     return { schedule: null, employees: null };
   }
 }
+
+/**
+ * Buscar a última escala semanal publicada e ativa no Supabase (para acesso direto sem token)
+ */
+export async function fetchLatestPublishedScheduleFromSupabase(): Promise<{
+  schedule: WeekSchedule | null;
+  employees: Employee[] | null;
+}> {
+  if (!isSupabaseConfigured() || !supabase) {
+    return { schedule: null, employees: null };
+  }
+
+  try {
+    const { data: schedData, error: schedErr } = await supabase
+      .from('schedules')
+      .select('*')
+      .eq('is_published', true)
+      .eq('is_public_share_enabled', true)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (schedErr || !schedData) {
+      return { schedule: null, employees: null };
+    }
+
+    const { data: empsData } = await supabase
+      .from('employees')
+      .select('*')
+      .eq('status', 'active');
+
+    const formattedEmps: Employee[] = (empsData || []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      role: row.role || 'Colaborador',
+      team: row.team || 'Operações de Loja',
+      workHours: row.work_hours || '08:00 às 17:00',
+      status: row.status || 'active',
+      avatarUrl: row.avatar_url || '',
+      initials: row.initials || row.name.slice(0, 2).toUpperCase(),
+      colorBg: row.color_bg || 'bg-blue-600',
+      admissionDate: row.admission_date || '',
+      preferredDaysOff: row.preferred_days_off || [5, 6],
+    }));
+
+    const formattedSchedule: WeekSchedule = {
+      weekId: schedData.week_id,
+      weekNumber: schedData.week_number,
+      year: schedData.year,
+      startDate: schedData.start_date,
+      endDate: schedData.end_date,
+      isPublished: schedData.is_published,
+      isPublicShareEnabled: schedData.is_public_share_enabled,
+      publishedAt: schedData.published_at,
+      shareToken: schedData.share_token,
+      shifts: schedData.shifts || {},
+      customHours: schedData.custom_hours || {},
+    };
+
+    return { schedule: formattedSchedule, employees: formattedEmps };
+  } catch (err) {
+    console.warn('Exceção ao buscar última escala pública no Supabase:', err);
+    return { schedule: null, employees: null };
+  }
+}
+
 
 /**
  * Buscar configurações da empresa do Supabase
