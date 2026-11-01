@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Employee, AuthUser, WeekSchedule, CompanySettings } from '../types';
-import { ADMIN_EMAIL, INITIAL_EMPLOYEES } from './scheduleEngine';
+import { ADMIN_EMAIL } from './scheduleEngine';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -69,23 +69,8 @@ export async function authenticateUser(
     };
   }
 
-  // Atalho garantido para o colaborador teste Thiago
-  if (cleanEmail === 'thiago@ilocmobile.com.br') {
-    const thiagoFromInit = INITIAL_EMPLOYEES.find(e => e.id === 'thiago');
-    return {
-      user: {
-        id: 'thiago',
-        name: thiagoFromInit?.name || 'Thiago Oliveira',
-        email: 'thiago@ilocmobile.com.br',
-        role: 'colaborador',
-        avatarUrl: thiagoFromInit?.avatarUrl || '',
-      },
-      error: null,
-    };
-  }
-
-  // Verifica se o colaborador existe na lista
-  let existingEmployees: Employee[] = INITIAL_EMPLOYEES;
+  // Verifica se o colaborador existe na lista salva
+  let existingEmployees: Employee[] = [];
   try {
     const saved = localStorage.getItem('iloc_employees');
     if (saved) existingEmployees = JSON.parse(saved);

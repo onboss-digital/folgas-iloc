@@ -126,8 +126,8 @@ export default function Home() {
         if (cloudEmployees && cloudEmployees.length > 0) {
           loadedEmployees = cloudEmployees;
           localStorage.setItem('iloc_employees', JSON.stringify(cloudEmployees));
-        } else if (loadedEmployees.length === 0 && !localStorage.getItem('iloc_data_cleared')) {
-          loadedEmployees = INITIAL_EMPLOYEES;
+        } else if (!savedEmployees) {
+          loadedEmployees = [];
         }
         setEmployees(loadedEmployees);
 
@@ -143,8 +143,6 @@ export default function Home() {
         const cloudCurrentSchedule = await fetchScheduleFromSupabase(currentWeekInfo.weekId);
         if (cloudCurrentSchedule) {
           loadedMap[cloudCurrentSchedule.weekId] = cloudCurrentSchedule;
-        } else if (Object.keys(loadedMap).length === 0 && !localStorage.getItem('iloc_data_cleared')) {
-          loadedMap = INITIAL_SCHEDULE_HISTORY;
         }
         setSchedulesMap(loadedMap);
       } catch (err) {
