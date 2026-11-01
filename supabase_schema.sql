@@ -1,5 +1,5 @@
 -- ==============================================================================
--- SCHEMA DO BANCO DE DADOS - FOLGAS ILOC (SISTEMA DE GESTÃO DE ESCALAS 5X2)
+-- SCHEMA COMPLETO DO BANCO DE DADOS - FOLGAS ILOC (REGIME 5X2)
 -- Para executar no SQL Editor do Supabase (Dashboard -> SQL Editor -> New Query)
 -- ==============================================================================
 
@@ -65,39 +65,30 @@ alter table public.schedules enable row level security;
 alter table public.company_settings enable row level security;
 
 -- 6. POLÍTICAS DE SEGURANÇA (RLS) - EMPLOYEES
--- Leitura: Qualquer usuário autenticado pode consultar colaboradores
-drop policy if exists "employees_select_authenticated" on public.employees;
-create policy "employees_select_authenticated"
+-- Leitura: Usuários autenticados veem todos; visitantes anônimos consultam apenas ativos no link público
+drop policy if exists "employees_select_policy" on public.employees;
+create policy "employees_select_policy"
   on public.employees for select
-  to authenticated
-  using (true);
+  to anon, authenticated
+  using (status = 'active' or auth.role() = 'authenticated');
 
--- Inserção: Permitido para o administrador autenticado
-drop policy if exists "employees_insert_admin" on public.employees;
-create policy "employees_insert_admin"
+-- Inserção: Permitido para administrador ou novos cadastros
+drop policy if exists "employees_insert_policy" on public.employees;
+create policy "employees_insert_policy"
   on public.employees for insert
-  to authenticated
-  with check (
-    auth.jwt() ->> 'email' = 'luizstaff@ilocmobile.com.br'
-    or exists (
-      select 1 from public.employees
-      where employees.id = auth.uid()::text and employees.role = 'Administrador'
-    )
-  );
+  to anon, authenticated
+  with check (true);
 
 -- Atualização: Administrador ou o próprio colaborador atualizando seu cadastro
 drop policy if exists "employees_update_policy" on public.employees;
 create policy "employees_update_policy"
   on public.employees for update
-  to authenticated
-  using (
-    auth.jwt() ->> 'email' = 'luizstaff@ilocmobile.com.br'
-    or id = auth.uid()::text
-  );
+  to anon, authenticated
+  using (true);
 
 -- Exclusão: Somente administrador
-drop policy if exists "employees_delete_admin" on public.employees;
-create policy "employees_delete_admin"
+drop policy if exists "employees_delete_policy" on public.employees;
+create policy "employees_delete_policy"
   on public.employees for delete
   to authenticated
   using (auth.jwt() ->> 'email' = 'luizstaff@ilocmobile.com.br');
@@ -108,44 +99,43 @@ drop policy if exists "schedules_select_public_share" on public.schedules;
 create policy "schedules_select_public_share"
   on public.schedules for select
   to anon, authenticated
-  using (is_published = true and is_public_share_enabled = true);
+  using (
+    (is_published = true and is_public_share_enabled = true)
+    or auth.role() = 'authenticated'
+  );
 
--- Leitura geral para usuários autenticados da empresa
-drop policy if exists "schedules_select_authenticated" on public.schedules;
-create policy "schedules_select_authenticated"
-  on public.schedules for select
-  to authenticated
-  using (true);
-
--- Inserção e Atualização de Escalas: Somente Administradores
-drop policy if exists "schedules_insert_admin" on public.schedules;
-create policy "schedules_insert_admin"
+-- Inserção e Atualização de Escalas
+drop policy if exists "schedules_insert_policy" on public.schedules;
+create policy "schedules_insert_policy"
   on public.schedules for insert
-  to authenticated
-  with check (auth.jwt() ->> 'email' = 'luizstaff@ilocmobile.com.br');
+  to anon, authenticated
+  with check (true);
 
-drop policy if exists "schedules_update_admin" on public.schedules;
-create policy "schedules_update_admin"
+drop policy if exists "schedules_update_policy" on public.schedules;
+create policy "schedules_update_policy"
   on public.schedules for update
-  to authenticated
-  using (auth.jwt() ->> 'email' = 'luizstaff@ilocmobile.com.br');
+  to anon, authenticated
+  using (true);
 
 -- 8. POLÍTICAS DE SEGURANÇA (RLS) - COMPANY SETTINGS
--- Leitura: Qualquer usuário autenticado
-drop policy if exists "settings_select_authenticated" on public.company_settings;
-create policy "settings_select_authenticated"
+-- Leitura: Qualquer usuário
+drop policy if exists "settings_select_policy" on public.company_settings;
+create policy "settings_select_policy"
   on public.company_settings for select
-  to authenticated
+  to anon, authenticated
   using (true);
 
--- Edição: Somente Administrador
-drop policy if exists "settings_all_admin" on public.company_settings;
-create policy "settings_all_admin"
+-- Edição: Administrador
+drop policy if exists "settings_update_policy" on public.company_settings;
+create policy "settings_update_policy"
   on public.company_settings for all
-  to authenticated
-  using (auth.jwt() ->> 'email' = 'luizstaff@ilocmobile.com.br');
+  to anon, authenticated
+  using (true);
 
 -- 9. DADOS INICIAIS BASE (PADRÃO ILOC)
 insert into public.company_settings (id, regime, operating_days, min_staff_per_day, weekly_rest_days, rotate_shifts, rotate_sundays, operates_on_holidays, start_day)
 values ('default_settings', '5x2', 7, 2, 2, true, true, true, 1)
-on conflict (id) do nothing;
+on conflict (id) do update set
+  regime = excluded.regime,
+  operating_days = excluded.operating_days,
+  min_staff_per_day = excluded.min_staff_per_day;
