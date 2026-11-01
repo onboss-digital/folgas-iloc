@@ -11,8 +11,9 @@ import {
   AlertCircle,
   Briefcase,
   Users,
+  ArrowLeftRight,
 } from 'lucide-react';
-import { Employee, WeekSchedule, DayInfo, AuthUser } from '../../types';
+import { Employee, WeekSchedule, DayInfo, AuthUser, ShiftSwapRequest } from '../../types';
 import { formatNameAndSurname, getEmployeeDayHours } from '../../lib/scheduleEngine';
 
 interface FuncionarioDashboardProps {
@@ -22,6 +23,9 @@ interface FuncionarioDashboardProps {
   todayIndex: number;
   todayStr?: string;
   currentUser?: AuthUser | null;
+  shiftSwaps?: ShiftSwapRequest[];
+  onOpenSolicitarTroca?: () => void;
+  onOpenMinhasTrocas?: () => void;
 }
 
 export function FuncionarioDashboard({
@@ -31,6 +35,9 @@ export function FuncionarioDashboard({
   todayIndex,
   todayStr,
   currentUser,
+  shiftSwaps = [],
+  onOpenSolicitarTroca,
+  onOpenMinhasTrocas,
 }: FuncionarioDashboardProps) {
   // Índice do dia em exibição (começa exatamente em todayIndex)
   const [viewingDayIdx, setViewingDayIdx] = useState<number>(todayIndex);
@@ -43,6 +50,11 @@ export function FuncionarioDashboard({
   const loggedEmployee = allEmployees.find(
     e => e.id === currentUser?.id || e.email?.toLowerCase() === currentUser?.email?.toLowerCase()
   );
+  const currentEmpId = loggedEmployee?.id || currentUser?.id;
+  const pendingIncomingCount = shiftSwaps.filter(
+    s => s.targetId === currentEmpId && s.status === 'pendente_colega'
+  ).length;
+
   const myShiftStatus = loggedEmployee
     ? schedule.shifts[loggedEmployee.id]?.[viewingDayIdx] || 'T'
     : null;
@@ -140,6 +152,75 @@ export function FuncionarioDashboard({
               </span>
             </div>
           </div>
+        </section>
+      )}
+
+      {/* Barra de Fuso e Troca de Escala */}
+      <section className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+            <Clock className="w-4 h-4 text-blue-600" />
+          </div>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-800">
+                Horários de Brasília (BRT)
+              </span>
+              <span className="px-2 py-0.2 rounded-md bg-slate-100 text-slate-600 text-[10px] font-mono font-bold">
+                GMT-3
+              </span>
+            </div>
+            <span className="text-[11px] text-slate-500">
+              Escala oficial padronizada pelo fuso horário de Brasília
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {onOpenSolicitarTroca && (
+            <button
+              type="button"
+              onClick={onOpenSolicitarTroca}
+              className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all"
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5" />
+              <span>Solicitar Troca de Escala</span>
+            </button>
+          )}
+
+          {onOpenMinhasTrocas && (
+            <button
+              type="button"
+              onClick={onOpenMinhasTrocas}
+              className="h-9 px-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 active:scale-95 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs relative"
+            >
+              <span>Minhas Trocas</span>
+              {pendingIncomingCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-blue-600 text-white text-[10px] font-black">
+                  {pendingIncomingCount}
+                </span>
+              )}
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* Alerta de Troca Pendente para o Colaborador */}
+      {pendingIncomingCount > 0 && onOpenMinhasTrocas && (
+        <section className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+            <span className="text-xs font-bold">
+              Você possui {pendingIncomingCount} solicitação{pendingIncomingCount > 1 ? 'ões' : ''} de troca de escala aguardando sua resposta.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenMinhasTrocas}
+            className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-2xs flex-shrink-0 text-center"
+          >
+            Ver e Responder
+          </button>
         </section>
       )}
 

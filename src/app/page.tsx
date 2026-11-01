@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ActiveTab, Employee, ShiftStatus, WeekSchedule, CompanySettings, AuthUser } from '../types';
+import { ActiveTab, Employee, ShiftStatus, WeekSchedule, CompanySettings, AuthUser, ShiftSwapRequest } from '../types';
 import {
   INITIAL_EMPLOYEES,
   INITIAL_SETTINGS,
@@ -12,6 +12,7 @@ import {
   calculateDailyCoverage,
   formatNameAndSurname,
   ADMIN_EMAIL,
+  applyShiftSwapToSchedule,
 } from '../lib/scheduleEngine';
 import { Header } from '../components/Header';
 import { BottomNav } from '../components/BottomNav';
@@ -22,6 +23,10 @@ import { CompartilharEscalaModal } from '../components/modal/CompartilharEscalaM
 import { LoginView } from '../components/auth/LoginView';
 import { Toast, ToastMessage } from '../components/Toast';
 import { PerfilView } from '../components/perfil/PerfilView';
+import { getTodayStrBrasilia, getNowIsoBrasilia } from '../lib/dateUtils';
+import { SolicitarTrocaModal } from '../components/modal/SolicitarTrocaModal';
+import { MinhasTrocasModal } from '../components/modal/MinhasTrocasModal';
+import { AdminTrocasModal } from '../components/modal/AdminTrocasModal';
 import {
   updateUserProfile,
   fetchEmployeesFromSupabase,
@@ -29,6 +34,8 @@ import {
   saveScheduleToSupabase,
   fetchSettingsFromSupabase,
   saveSettingsToSupabase,
+  fetchShiftSwapsFromSupabase,
+  saveShiftSwapToSupabase,
 } from '../lib/supabase';
 
 export default function Home() {
@@ -42,6 +49,10 @@ export default function Home() {
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [todayStr, setTodayStr] = useState<string>('2026-10-29');
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
+  const [shiftSwaps, setShiftSwaps] = useState<ShiftSwapRequest[]>([]);
+  const [isSolicitarTrocaOpen, setIsSolicitarTrocaOpen] = useState<boolean>(false);
+  const [isMinhasTrocasOpen, setIsMinhasTrocasOpen] = useState<boolean>(false);
+  const [isAdminTrocasOpen, setIsAdminTrocasOpen] = useState<boolean>(false);
 
   // Calcula dados da semana atual baseados no weekOffset
   const currentWeekInfo = getWeekDateRange(weekOffset);
@@ -234,6 +245,108 @@ export default function Home() {
 
     // Sincronização em nuvem quando Supabase estiver disponível
     saveScheduleToSupabase(newSchedule).catch(() => {});
+  };
+
+  const persistShiftSwaps = (updatedSwaps: ShiftSwapRequest[]) => {
+    setShiftSwaps(updatedSwaps);
+    try {
+      localStorage.setItem('iloc_shift_swaps', JSON.stringify(updatedSwaps));
+    } catch {}
+  };
+
+  const handleCreateShiftSwap = async (newSwap: ShiftSwapRequest) => {
+    const updated = [newSwap, ...shiftSwaps];
+    persistShiftSwaps(updated);
+    saveShiftSwapToSupabase(newSwap).catch(() => {});
+    showToast('Solicitação de troca enviada ao colega com sucesso!', 'success');
+  };
+
+  const handleRespondShiftSwap = async (
+    swapId: string,
+    accept: boolean,
+    reason?: string
+  ) => {
+    const swap = shiftSwaps.find(s => s.id === swapId);
+    if (!swap) return;
+
+    const nowIso = getNowIsoBrasilia();
+    const updatedSwap: ShiftSwapRequest = {
+      ...swap,
+      status: accept ? 'pendente_admin' : 'recusada_colega',
+      colleagueRespondedAt: nowIso,
+      rejectionReason: !accept ? reason : swap.rejectionReason,
+    };
+
+    const updated = shiftSwaps.map(s => (s.id === swapId ? updatedSwap : s));
+    persistShiftSwaps(updated);
+    saveShiftSwapToSupabase(updatedSwap).catch(() => {});
+
+    if (accept) {
+      showToast('Troca aceita! Encaminhada para aprovação do Administrador.', 'success');
+    } else {
+      showToast('Solicitação de troca recusada.', 'info');
+    }
+  };
+
+  const handleCancelShiftSwap = async (swapId: string) => {
+    const swap = shiftSwaps.find(s => s.id === swapId);
+    if (!swap) return;
+
+    const updatedSwap: ShiftSwapRequest = {
+      ...swap,
+      status: 'cancelada',
+    };
+
+    const updated = shiftSwaps.map(s => (s.id === swapId ? updatedSwap : s));
+    persistShiftSwaps(updated);
+    saveShiftSwapToSupabase(updatedSwap).catch(() => {});
+    showToast('Solicitação de troca cancelada.', 'info');
+  };
+
+  const handleApproveShiftSwap = async (swapId: string) => {
+    const swap = shiftSwaps.find(s => s.id === swapId);
+    if (!swap) return;
+
+    const nowIso = getNowIsoBrasilia();
+    const updatedSwap: ShiftSwapRequest = {
+      ...swap,
+      status: 'aprovada',
+      adminDecidedAt: nowIso,
+      adminId: currentUser?.id,
+    };
+
+    // Aplica a alteração na escala da respectiva semana
+    const targetSchedule = schedulesMap[swap.weekId] || (schedule.weekId === swap.weekId ? schedule : null);
+    if (targetSchedule) {
+      const newSchedule = applyShiftSwapToSchedule(targetSchedule, swap);
+      persistSchedule(newSchedule);
+    }
+
+    const updated = shiftSwaps.map(s => (s.id === swapId ? updatedSwap : s));
+    persistShiftSwaps(updated);
+    saveShiftSwapToSupabase(updatedSwap).catch(() => {});
+
+    showToast('Troca aprovada! A escala foi atualizada com sucesso.', 'success');
+  };
+
+  const handleRejectShiftSwap = async (swapId: string, reason?: string) => {
+    const swap = shiftSwaps.find(s => s.id === swapId);
+    if (!swap) return;
+
+    const nowIso = getNowIsoBrasilia();
+    const updatedSwap: ShiftSwapRequest = {
+      ...swap,
+      status: 'recusada_admin',
+      rejectionReason: reason,
+      adminDecidedAt: nowIso,
+      adminId: currentUser?.id,
+    };
+
+    const updated = shiftSwaps.map(s => (s.id === swapId ? updatedSwap : s));
+    persistShiftSwaps(updated);
+    saveShiftSwapToSupabase(updatedSwap).catch(() => {});
+
+    showToast('Solicitação de troca recusada pelo administrador.', 'info');
   };
 
   // Manipuladores de Escala
@@ -518,6 +631,7 @@ export default function Home() {
       localStorage.setItem('iloc_settings', JSON.stringify(INITIAL_SETTINGS));
       localStorage.setItem('iloc_schedules_map', JSON.stringify(INITIAL_SCHEDULE_HISTORY));
       localStorage.setItem('iloc_schedule', JSON.stringify(INITIAL_WEEK_SCHEDULE));
+      localStorage.removeItem('iloc_shift_swaps');
     } catch {}
 
     persistEmployees(INITIAL_EMPLOYEES);
@@ -713,6 +827,37 @@ export default function Home() {
         isAdmin={currentUser?.role === 'admin'}
         onTogglePublicShare={handleTogglePublicShare}
         onCopySuccess={() => showToast('Link copiado para a área de transferência.', 'success')}
+      />
+
+      {/* Modais de Solicitação, Gestão e Aprovação de Trocas de Escalas */}
+      <SolicitarTrocaModal
+        isOpen={isSolicitarTrocaOpen}
+        onClose={() => setIsSolicitarTrocaOpen(false)}
+        currentUser={currentUser}
+        allEmployees={employees}
+        schedule={schedule}
+        days={days}
+        existingSwaps={shiftSwaps}
+        onSubmitSwap={handleCreateShiftSwap}
+      />
+
+      <MinhasTrocasModal
+        isOpen={isMinhasTrocasOpen}
+        onClose={() => setIsMinhasTrocasOpen(false)}
+        currentUser={currentUser}
+        employees={employees}
+        swaps={shiftSwaps}
+        onRespondSwap={handleRespondShiftSwap}
+        onCancelSwap={handleCancelShiftSwap}
+      />
+
+      <AdminTrocasModal
+        isOpen={isAdminTrocasOpen}
+        onClose={() => setIsAdminTrocasOpen(false)}
+        currentUser={currentUser}
+        swaps={shiftSwaps}
+        onApproveSwap={handleApproveShiftSwap}
+        onRejectSwap={handleRejectShiftSwap}
       />
 
       <Toast toast={toast} />

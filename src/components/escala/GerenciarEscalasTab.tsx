@@ -32,6 +32,7 @@ import {
   DayInfo,
   CompanySettings,
   AuthUser,
+  ShiftSwapRequest,
 } from '../../types';
 import {
   formatNameAndSurname,
@@ -60,6 +61,8 @@ interface GerenciarEscalasTabProps {
   isScheduleCreated?: boolean;
   onCreateSchedule?: () => void;
   onNavigateToAjustes?: () => void;
+  shiftSwaps?: ShiftSwapRequest[];
+  onOpenAdminTrocas?: () => void;
 }
 
 interface QuickDayEditor {
@@ -142,7 +145,14 @@ export function GerenciarEscalasTab({
   isScheduleCreated,
   onCreateSchedule,
   onNavigateToAjustes,
+  shiftSwaps = [],
+  onOpenAdminTrocas,
 }: GerenciarEscalasTabProps) {
+  // Quantidade de trocas de escalas aguardando aprovação do administrador
+  const pendingAdminSwapsCount = shiftSwaps.filter(
+    s => s.status === 'pendente_admin'
+  ).length;
+
   // Informações formatadas do mês e semana
   const weekHeader = getWeekDisplayHeader(days);
 
@@ -655,6 +665,25 @@ export function GerenciarEscalasTab({
 
   return (
     <div className="flex flex-col gap-4 pb-10">
+      {/* Alerta de Trocas Aguardando Aprovação do Administrador */}
+      {pendingAdminSwapsCount > 0 && onOpenAdminTrocas && (
+        <section className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <Clock className="w-4 h-4 text-blue-600 flex-shrink-0" />
+            <span className="text-xs font-bold">
+              Existe{pendingAdminSwapsCount > 1 ? 'm' : ''} {pendingAdminSwapsCount} solicitação{pendingAdminSwapsCount > 1 ? 'ões' : ''} de troca de escala aceita{pendingAdminSwapsCount > 1 ? 's' : ''} pelos colaboradores aguardando sua validação.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenAdminTrocas}
+            className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs flex-shrink-0 text-center"
+          >
+            Revisar e Decidir
+          </button>
+        </section>
+      )}
+
       {/* ==============================================================
           1. BARRA SUPERIOR CONSOLIDADA: NAVEGAÇÃO, FILTROS E AÇÕES
           ============================================================== */}

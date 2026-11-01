@@ -1,4 +1,4 @@
-import { Employee, ShiftStatus, WeekSchedule, CompanySettings, DayInfo } from '../types';
+import { Employee, ShiftStatus, WeekSchedule, CompanySettings, DayInfo, ShiftSwapRequest } from '../types';
 import { getHolidayInfo } from './holidays';
 
 export const DAY_NAMES = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'] as const;
@@ -356,4 +356,73 @@ export function generateAutomaticSchedule(
   });
 
   return result;
+}
+
+
+/**
+ * Aplica uma solicitação de troca de escala aprovada entre dois colaboradores
+ */
+export function applyShiftSwapToSchedule(
+  schedule: WeekSchedule,
+  swap: ShiftSwapRequest
+): WeekSchedule {
+  const shifts: Record<string, ShiftStatus[]> = {};
+  const customHours: Record<string, (string | undefined)[]> = {};
+
+  Object.keys(schedule.shifts).forEach(empId => {
+    shifts[empId] = [...(schedule.shifts[empId] || Array(7).fill('T'))];
+  });
+
+  if (schedule.customHours) {
+    Object.keys(schedule.customHours).forEach(empId => {
+      customHours[empId] = [...(schedule.customHours![empId] || Array(7).fill(undefined))];
+    });
+  }
+
+  const reqShifts = shifts[swap.requesterId] || Array(7).fill('T');
+  const targetShifts = shifts[swap.targetId] || Array(7).fill('T');
+  const reqHours = customHours[swap.requesterId] || Array(7).fill(undefined);
+  const targetHours = customHours[swap.targetId] || Array(7).fill(undefined);
+
+  const dayA = swap.requesterDayIndex;
+  const dayB = swap.targetDayIndex;
+
+  if (dayA === dayB) {
+    // Mesmo dia: troca direta de turnos e horários no mesmo dia
+    const tempShift = reqShifts[dayA];
+    reqShifts[dayA] = targetShifts[dayA];
+    targetShifts[dayA] = tempShift;
+
+    const tempHours = reqHours[dayA];
+    reqHours[dayA] = targetHours[dayA];
+    targetHours[dayA] = tempHours;
+  } else {
+    // Dias distintos (ex: dia A do solicitante por dia B do colega)
+    const tempShiftA = reqShifts[dayA];
+    reqShifts[dayA] = targetShifts[dayA];
+    targetShifts[dayA] = tempShiftA;
+
+    const tempHoursA = reqHours[dayA];
+    reqHours[dayA] = targetHours[dayA];
+    targetHours[dayA] = tempHoursA;
+
+    const tempShiftB = targetShifts[dayB];
+    targetShifts[dayB] = reqShifts[dayB];
+    reqShifts[dayB] = tempShiftB;
+
+    const tempHoursB = targetHours[dayB];
+    targetHours[dayB] = reqHours[dayB];
+    reqHours[dayB] = tempHoursB;
+  }
+
+  shifts[swap.requesterId] = reqShifts;
+  shifts[swap.targetId] = targetShifts;
+  customHours[swap.requesterId] = reqHours;
+  customHours[swap.targetId] = targetHours;
+
+  return {
+    ...schedule,
+    shifts,
+    customHours,
+  };
 }

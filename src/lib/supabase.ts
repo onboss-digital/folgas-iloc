@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Employee, AuthUser, WeekSchedule, CompanySettings } from '../types';
+import { Employee, AuthUser, WeekSchedule, CompanySettings, ShiftSwapRequest } from '../types';
 import { ADMIN_EMAIL } from './scheduleEngine';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -494,5 +494,103 @@ export async function saveSettingsToSupabase(settings: CompanySettings): Promise
   } catch (err) {
     console.warn('Exceção ao persistir settings no Supabase:', err);
     return false;
+  }
+}
+
+
+/**
+ * Consultar solicitações de troca de escala no Supabase
+ */
+export async function fetchShiftSwapsFromSupabase(weekId?: string): Promise<ShiftSwapRequest[]> {
+  if (!isSupabaseConfigured() || !supabase) return [];
+
+  try {
+    let query = supabase
+      .from('shift_swaps')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (weekId) {
+      query = query.eq('week_id', weekId);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) {
+      console.warn('Aviso ao consultar shift_swaps no Supabase:', error?.message);
+      return [];
+    }
+
+    return data.map((row: any) => ({
+      id: row.id,
+      weekId: row.week_id,
+      requesterId: row.requester_id,
+      requesterName: row.requester_name,
+      requesterTeam: row.requester_team,
+      targetId: row.target_id,
+      targetName: row.target_name,
+      targetTeam: row.target_team,
+      requesterDayIndex: row.requester_day_index,
+      requesterDayDate: row.requester_day_date,
+      requesterOriginalShift: row.requester_original_shift,
+      requesterOriginalHours: row.requester_original_hours || undefined,
+      targetDayIndex: row.target_day_index,
+      targetDayDate: row.target_day_date,
+      targetOriginalShift: row.target_original_shift,
+      targetOriginalHours: row.target_original_hours || undefined,
+      reason: row.reason || undefined,
+      rejectionReason: row.rejection_reason || undefined,
+      status: row.status,
+      createdAt: row.created_at,
+      colleagueRespondedAt: row.colleague_responded_at || undefined,
+      adminDecidedAt: row.admin_decided_at || undefined,
+      adminId: row.admin_id || undefined,
+    }));
+  } catch (err) {
+    console.warn('Exceção ao consultar shift_swaps:', err);
+    return [];
+  }
+}
+
+/**
+ * Salvar ou atualizar solicitação de troca de escala no Supabase
+ */
+export async function saveShiftSwapToSupabase(swap: ShiftSwapRequest): Promise<{ error: string | null }> {
+  if (!isSupabaseConfigured() || !supabase) return { error: null };
+
+  try {
+    const { error } = await supabase.from('shift_swaps').upsert({
+      id: swap.id,
+      week_id: swap.weekId,
+      requester_id: swap.requesterId,
+      requester_name: swap.requesterName,
+      requester_team: swap.requesterTeam,
+      target_id: swap.targetId,
+      target_name: swap.targetName,
+      target_team: swap.targetTeam,
+      requester_day_index: swap.requesterDayIndex,
+      requester_day_date: swap.requesterDayDate,
+      requester_original_shift: swap.requesterOriginalShift,
+      requester_original_hours: swap.requesterOriginalHours || null,
+      target_day_index: swap.targetDayIndex,
+      target_day_date: swap.targetDayDate,
+      target_original_shift: swap.targetOriginalShift,
+      target_original_hours: swap.targetOriginalHours || null,
+      reason: swap.reason || null,
+      rejection_reason: swap.rejectionReason || null,
+      status: swap.status,
+      created_at: swap.createdAt,
+      colleague_responded_at: swap.colleagueRespondedAt || null,
+      admin_decided_at: swap.adminDecidedAt || null,
+      admin_id: swap.adminId || null,
+    });
+
+    if (error) {
+      console.warn('Erro ao salvar shift_swap no Supabase:', error.message);
+      return { error: error.message };
+    }
+
+    return { error: null };
+  } catch (err: any) {
+    return { error: err.message || 'Falha ao salvar no banco de dados.' };
   }
 }

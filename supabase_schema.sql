@@ -139,3 +139,58 @@ on conflict (id) do update set
   regime = excluded.regime,
   operating_days = excluded.operating_days,
   min_staff_per_day = excluded.min_staff_per_day;
+
+
+-- ==============================================================================
+-- 10. TABELA DE SOLICITAÇÕES DE TROCA DE ESCALA (SHIFT SWAPS)
+-- ==============================================================================
+create table if not exists public.shift_swaps (
+  id text primary key,
+  week_id text not null,
+  requester_id text not null,
+  requester_name text not null,
+  requester_team text not null,
+  target_id text not null,
+  target_name text not null,
+  target_team text not null,
+  requester_day_index integer not null,
+  requester_day_date text not null,
+  requester_original_shift text not null,
+  requester_original_hours text,
+  target_day_index integer not null,
+  target_day_date text not null,
+  target_original_shift text not null,
+  target_original_hours text,
+  reason text,
+  rejection_reason text,
+  status text not null default 'pendente_colega' check (status in ('pendente_colega', 'recusada_colega', 'pendente_admin', 'aprovada', 'recusada_admin', 'cancelada')),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  colleague_responded_at timestamp with time zone,
+  admin_decided_at timestamp with time zone,
+  admin_id text
+);
+
+create index if not exists idx_shift_swaps_week_id on public.shift_swaps(week_id);
+create index if not exists idx_shift_swaps_requester on public.shift_swaps(requester_id);
+create index if not exists idx_shift_swaps_target on public.shift_swaps(target_id);
+create index if not exists idx_shift_swaps_status on public.shift_swaps(status);
+
+alter table public.shift_swaps enable row level security;
+
+drop policy if exists "shift_swaps_select_policy" on public.shift_swaps;
+create policy "shift_swaps_select_policy"
+  on public.shift_swaps for select
+  to anon, authenticated
+  using (true);
+
+drop policy if exists "shift_swaps_insert_policy" on public.shift_swaps;
+create policy "shift_swaps_insert_policy"
+  on public.shift_swaps for insert
+  to anon, authenticated
+  with check (true);
+
+drop policy if exists "shift_swaps_update_policy" on public.shift_swaps;
+create policy "shift_swaps_update_policy"
+  on public.shift_swaps for update
+  to anon, authenticated
+  using (true);

@@ -12,7 +12,7 @@ import {
   Eye,
   Edit3,
 } from 'lucide-react';
-import { Employee, WeekSchedule, CompanySettings, DayInfo, AuthUser } from '../../types';
+import { Employee, WeekSchedule, CompanySettings, DayInfo, AuthUser, ShiftSwapRequest } from '../../types';
 import { formatNameAndSurname, getEmployeeDayHours } from '../../lib/scheduleEngine';
 import { HistoricoEscalas } from '../escala/HistoricoEscalas';
 import { LinkEscalaCard } from '../escala/LinkEscalaCard';
@@ -38,6 +38,10 @@ interface EscalaTabProps {
   isScheduleCreated?: boolean;
   onCreateScheduleForWeek?: () => void;
   onNavigateToAjustes?: () => void;
+  shiftSwaps?: ShiftSwapRequest[];
+  onOpenAdminTrocas?: () => void;
+  onOpenSolicitarTroca?: () => void;
+  onOpenMinhasTrocas?: () => void;
 }
 
 export function EscalaTab({
@@ -60,6 +64,10 @@ export function EscalaTab({
   isScheduleCreated,
   onCreateScheduleForWeek,
   onNavigateToAjustes,
+  shiftSwaps = [],
+  onOpenAdminTrocas,
+  onOpenSolicitarTroca,
+  onOpenMinhasTrocas,
 }: EscalaTabProps) {
   // Informações formatadas do mês e semana
   const weekHeader = getWeekDisplayHeader(days);
@@ -72,6 +80,10 @@ export function EscalaTab({
   const loggedEmp = employees.find(
     e => e.id === currentUser?.id || e.email?.toLowerCase() === currentUser?.email?.toLowerCase()
   );
+  const currentEmpId = loggedEmp?.id || currentUser?.id;
+  const pendingIncomingSwapsCount = shiftSwaps.filter(
+    s => s.targetId === currentEmpId && s.status === 'pendente_colega'
+  ).length;
 
   // Modo de visualização do Administrador ('editor' ou 'preview')
   const [adminViewMode, setAdminViewMode] = useState<'editor' | 'preview'>('editor');
@@ -133,6 +145,8 @@ export function EscalaTab({
           isScheduleCreated={isScheduleCreated}
           onCreateSchedule={onCreateScheduleForWeek}
           onNavigateToAjustes={onNavigateToAjustes}
+          shiftSwaps={shiftSwaps}
+          onOpenAdminTrocas={onOpenAdminTrocas}
         />
       </div>
     );
@@ -202,20 +216,52 @@ export function EscalaTab({
         </div>
       )}
 
-      {/* Topo: Identificação do Time */}
-      <section className="flex items-center justify-between pt-1">
+      {/* Topo: Identificação do Time e Ações de Troca */}
+      <section className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shadow-2xs flex-shrink-0">
             <Users className="w-4 h-4 text-blue-700" />
           </div>
           <div className="flex flex-col">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Escala do Time
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Escala do Time • {selectedTeam || 'Operações de Loja'}
+              </span>
+              <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px] font-mono font-bold">
+                BRT
+              </span>
+            </div>
             <h1 className="text-base font-black text-slate-900 tracking-tight">
-              {selectedTeam || 'Operações de Loja'}
+              Quadro de Escalas da Equipe
             </h1>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {onOpenSolicitarTroca && (
+            <button
+              type="button"
+              onClick={onOpenSolicitarTroca}
+              className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all"
+            >
+              <span>Solicitar Troca de Escala</span>
+            </button>
+          )}
+
+          {onOpenMinhasTrocas && (
+            <button
+              type="button"
+              onClick={onOpenMinhasTrocas}
+              className="h-9 px-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 active:scale-95 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs relative"
+            >
+              <span>Minhas Trocas</span>
+              {pendingIncomingSwapsCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-blue-600 text-white text-[10px] font-black">
+                  {pendingIncomingSwapsCount}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </section>
 

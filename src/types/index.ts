@@ -8,7 +8,7 @@ export interface Employee {
   email?: string; // E-mail institucional de login
   role: string;
   status: 'active' | 'inactive';
-  team?: string; // Time ao qual pertence (ex: 'Operações e Loja', 'Vendas e Atendimento', etc.)
+  team?: string; // Time ao qual pertence (ex: 'Operações de Loja', 'Vendas e Atendimento', etc.)
   workHours?: string; // Horário de expediente (ex: '08:00 às 17:00')
   avatarUrl?: string;
   initials: string;
@@ -64,3 +64,37 @@ export interface CompanySettings {
 }
 
 export type ActiveTab = 'inicio' | 'escala' | 'ajustes' | 'perfil';
+
+export type ShiftSwapStatus =
+  | 'pendente_colega'
+  | 'recusada_colega'
+  | 'pendente_admin'
+  | 'aprovada'
+  | 'recusada_admin'
+  | 'cancelada';
+
+export interface ShiftSwapRequest {
+  id: string;
+  weekId: string;
+  requesterId: string;
+  requesterName: string;
+  requesterTeam: string;
+  targetId: string;
+  targetName: string;
+  targetTeam: string;
+  requesterDayIndex: number;
+  requesterDayDate: string;
+  requesterOriginalShift: ShiftStatus;
+  requesterOriginalHours?: string;
+  targetDayIndex: number;
+  targetDayDate: string;
+  targetOriginalShift: ShiftStatus;
+  targetOriginalHours?: string;
+  reason?: string;
+  rejectionReason?: string;
+  status: ShiftSwapStatus;
+  createdAt: string;
+  colleagueRespondedAt?: string;
+  adminDecidedAt?: string;
+  adminId?: string;
+}
