@@ -1240,21 +1240,21 @@ export function GerenciarEscalasTab({
                   onClick={() => handleApplyPresetToWeek('5x2_sab_dom')}
                   className="px-2.5 py-1 rounded-xl bg-white border border-blue-300 text-xs font-bold text-blue-800 hover:bg-blue-100 transition-colors shadow-2xs"
                 >
-                  Padrão 5x2 (Folga Sáb/Dom)
+                  Folga Sáb/Dom
                 </button>
                 <button
                   type="button"
                   onClick={() => handleApplyPresetToWeek('5x2_dom_seg')}
                   className="px-2.5 py-1 rounded-xl bg-white border border-blue-300 text-xs font-bold text-blue-800 hover:bg-blue-100 transition-colors shadow-2xs"
                 >
-                  Padrão 5x2 (Folga Dom/Seg)
+                  Folga Dom/Seg
                 </button>
                 <button
                   type="button"
                   onClick={() => handleApplyPresetToWeek('6x1_dom')}
                   className="px-2.5 py-1 rounded-xl bg-white border border-blue-300 text-xs font-bold text-blue-800 hover:bg-blue-100 transition-colors shadow-2xs"
                 >
-                  Padrão 6x1 (Folga no Domingo)
+                  Folga no Domingo
                 </button>
               </div>
             </div>

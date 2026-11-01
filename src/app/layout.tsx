@@ -10,8 +10,8 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Folgas iLoc — Gestão de Escala 5x2",
-  description: "Sistema web de gestão de escalas e folgas 5x2 para equipe",
+  title: "Folgas iLoc — Sistema de Escala de Trabalho",
+  description: "Sistema web de gestão de escalas de trabalho e folgas para equipe",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

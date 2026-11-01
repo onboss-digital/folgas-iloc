@@ -456,7 +456,7 @@ export function AjustesTab({
           <div className="flex items-center gap-1.5">
             <Sliders className="w-4 h-4 text-blue-600" />
             <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-              Parâmetros da Escala 5x2
+              Parâmetros da Escala de Trabalho
             </h2>
           </div>
 
@@ -468,7 +468,7 @@ export function AjustesTab({
                   Regime de Trabalho
                 </span>
                 <span className="text-[11px] text-slate-500">
-                  5 dias de trabalho para 2 de folga semanal
+                  Organização de jornadas, turnos e folgas da equipe
                 </span>
               </div>
               <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold">

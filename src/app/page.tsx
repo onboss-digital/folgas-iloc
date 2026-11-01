@@ -259,7 +259,7 @@ export default function Home() {
       shifts: newShifts,
     };
     persistSchedule(updatedSchedule);
-    showToast('Escala gerada automaticamente em conformidade 5x2.', 'success');
+    showToast('Escala gerada automaticamente em conformidade com as regras de trabalho.', 'success');
   };
 
   const handleSaveDraft = (newSchedule: WeekSchedule) => {

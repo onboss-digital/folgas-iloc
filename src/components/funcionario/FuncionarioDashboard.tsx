@@ -268,7 +268,7 @@ export function FuncionarioDashboard({
                   {isMyDayOff
                     ? currentDayInfo.isHoliday
                       ? 'Folga garantida por lei em feriado nacional'
-                      : 'Aproveite seu dia de folga previsto na escala 5x2'
+                      : 'Aproveite seu dia de folga programado na escala de trabalho'
                     : currentDayInfo.isHoliday
                     ? 'Trabalho em feriado: direito a folga compensatória ou adicional de 100%'
                     : 'Turno regular com 1 hora de intervalo para refeição'}
@@ -417,7 +417,7 @@ export function FuncionarioDashboard({
                     <span>{getEmployeeDayHours(schedule, emp, viewingDayIdx)}</span>
                   </span>
                   <span className="text-[10px] text-slate-400 mt-0.5">
-                    {currentDayInfo.isHoliday ? 'Feriado • 1h intervalo' : '1h de intervalo'}
+                    {currentDayInfo.isHoliday ? 'Feriado • Horário de Brasília' : 'Horário de Brasília (GMT-3)'}
                   </span>
                 </div>
               </div>

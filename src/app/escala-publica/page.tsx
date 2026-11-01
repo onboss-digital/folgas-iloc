@@ -187,7 +187,7 @@ function EscalaPublicaContent() {
               {weekHeader.monthTitle}
             </span>
             <span className="bg-blue-700/60 px-2 py-0.5 rounded-full text-[11px] font-medium">
-              Regime 5x2
+              Horário de Brasília (GMT-3)
             </span>
           </div>
 
@@ -310,7 +310,7 @@ function EscalaPublicaContent() {
                         <span>{dayHours.replace('às', '–')}</span>
                       </span>
                       <span className="text-[10px] text-slate-400 mt-0.5">
-                        Intervalo 1h
+                        1h intervalo • Horário de Brasília
                       </span>
                     </div>
                   </div>
@@ -345,7 +345,7 @@ function EscalaPublicaContent() {
                           {formatNameAndSurname(emp.name)}
                         </span>
                         <span className="text-[10px] text-rose-600 font-semibold">
-                          {selectedDay.isHoliday ? 'Folga Compensatória' : 'Folga 5x2'}
+                          {selectedDay.isHoliday ? 'Folga Compensatória' : 'Folga Programada'}
                         </span>
                       </div>
                     </div>
