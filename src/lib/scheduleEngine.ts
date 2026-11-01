@@ -426,3 +426,40 @@ export function applyShiftSwapToSchedule(
     customHours,
   };
 }
+
+/**
+ * Constrói URL pública inteligente da escala contendo os parâmetros de semana e período legíveis
+ */
+export function buildPublicScheduleUrl(schedule: WeekSchedule, origin?: string): string {
+  const baseUrl =
+    origin ||
+    (typeof window !== 'undefined'
+      ? window.location.origin
+      : 'https://folgas-iloc.vercel.app');
+
+  if (!schedule) return `${baseUrl}/escala-publica`;
+
+  const params = new URLSearchParams();
+
+  // 1. Identificador de semana (ex: 2026-W45)
+  if (schedule.weekId) {
+    params.set('semana', schedule.weekId);
+  }
+
+  // 2. Período legível da semana na URL (ex: 02-11-a-08-11-2026)
+  if (schedule.startDate && schedule.endDate) {
+    const sParts = schedule.startDate.split('-');
+    const eParts = schedule.endDate.split('-');
+    if (sParts.length === 3 && eParts.length === 3) {
+      params.set('periodo', `${sParts[2]}-${sParts[1]}-a-${eParts[2]}-${eParts[1]}-${eParts[0]}`);
+    }
+  }
+
+  // 3. Token de compartilhamento e autorização
+  if (schedule.shareToken) {
+    params.set('token', schedule.shareToken);
+  }
+
+  const qs = params.toString();
+  return qs ? `${baseUrl}/escala-publica?${qs}` : `${baseUrl}/escala-publica`;
+}

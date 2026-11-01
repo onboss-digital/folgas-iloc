@@ -1,5 +1,5 @@
 -- ==============================================================================
--- SCHEMA COMPLETO DO BANCO DE DADOS - FOLGAS ILOC (REGIME 5X2)
+-- SCHEMA COMPLETO DO BANCO DE DADOS - ESCALAS ILOC (REGIME 5X2)
 -- Para executar no SQL Editor do Supabase (Dashboard -> SQL Editor -> New Query)
 -- ==============================================================================
 

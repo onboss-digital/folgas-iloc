@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Share2, Copy, Check, MessageCircle, AlertCircle } from 'lucide-react';
 import { WeekSchedule } from '../../types';
+import { buildPublicScheduleUrl } from '../../lib/scheduleEngine';
 
 interface LinkEscalaCardProps {
   schedule: WeekSchedule;
@@ -14,9 +15,7 @@ export function LinkEscalaCard({ schedule, onCopySuccess }: LinkEscalaCardProps)
 
   const isPublishedAndActive = schedule.isPublished && schedule.isPublicShareEnabled;
 
-  const shareUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/escala-publica`
-    : 'http://localhost:3000/escala-publica';
+  const shareUrl = buildPublicScheduleUrl(schedule);
 
   const handleCopyLink = () => {
     if (!isPublishedAndActive) return;
@@ -29,7 +28,7 @@ export function LinkEscalaCard({ schedule, onCopySuccess }: LinkEscalaCardProps)
   const handleShareWhatsApp = () => {
     if (!isPublishedAndActive) return;
     const text = encodeURIComponent(
-      `Escala de Trabalho - Folgas iLoc:\nConfira os dias e turnos de trabalho atualizados no link oficial:\n${shareUrl}`
+      `Escala de Trabalho - Escalas iLoc:\nConfira os dias e turnos de trabalho atualizados no link oficial:\n${shareUrl}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };

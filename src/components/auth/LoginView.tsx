@@ -62,7 +62,7 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
             iLoc
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-            Folgas iLoc
+            Escalas iLoc
           </h1>
           <p className="text-xs text-slate-500">
             Acesse sua conta para visualizar e gerenciar escalas

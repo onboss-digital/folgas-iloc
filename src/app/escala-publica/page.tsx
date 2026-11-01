@@ -17,12 +17,14 @@ import {
   getEmployeeDayHours,
 } from '../../lib/scheduleEngine';
 import { getWeekDisplayHeader } from '../../components/escala/GerenciarEscalasTab';
-import { fetchPublicScheduleByToken, fetchLatestPublishedScheduleFromSupabase } from '../../lib/supabase';
+import { fetchPublicScheduleByToken, fetchPublicScheduleByWeekId, fetchLatestPublishedScheduleFromSupabase } from '../../lib/supabase';
 import { getTodayStrBrasilia } from '../../lib/dateUtils';
 
 function EscalaPublicaContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
+  const semanaParam = searchParams.get('semana') || searchParams.get('week');
+  const periodoParam = searchParams.get('periodo');
 
   const [schedule, setSchedule] = useState<WeekSchedule>({
     weekId: '',
@@ -51,8 +53,23 @@ function EscalaPublicaContent() {
       let resolvedSchedule: WeekSchedule | null = null;
       let resolvedEmployees: Employee[] = [];
 
-      // 1. Se houver token na URL, consulta a escala específica no banco de dados na nuvem
-      if (token) {
+      // 1. Se houver semana específica na URL (ex: 2026-W45), busca prioritariamente pela semana oficial
+      if (semanaParam) {
+        try {
+          const { schedule: weekSched, employees: weekEmps } = await fetchPublicScheduleByWeekId(semanaParam);
+          if (weekSched) {
+            resolvedSchedule = weekSched;
+            if (weekEmps && weekEmps.length > 0) {
+              resolvedEmployees = weekEmps;
+            }
+          }
+        } catch (err) {
+          console.warn('Aviso ao consultar escala por semana na nuvem:', err);
+        }
+      }
+
+      // 2. Se houver token na URL e ainda não encontrou, busca pelo token de compartilhamento
+      if (!resolvedSchedule && token) {
         try {
           const { schedule: cloudSched, employees: cloudEmps } = await fetchPublicScheduleByToken(token);
           if (cloudSched) {
@@ -66,7 +83,7 @@ function EscalaPublicaContent() {
         }
       }
 
-      // 2. Se não houver token ou se a busca por token falhar, busca a escala publicada mais recente na nuvem
+      // 3. Se não houver parâmetros específicos ou falhar, busca a escala mais recente publicada na nuvem
       if (!resolvedSchedule) {
         try {
           const { schedule: latestCloudSched, employees: latestCloudEmps } = await fetchLatestPublishedScheduleFromSupabase();
@@ -81,7 +98,7 @@ function EscalaPublicaContent() {
         }
       }
 
-      // 3. Fallback para dados locais do navegador (quando operando offline ou mesmo ambiente)
+      // 4. Fallback para dados locais do navegador
       if (!resolvedSchedule) {
         try {
           const savedMap = localStorage.getItem('iloc_schedules_map');
@@ -89,12 +106,18 @@ function EscalaPublicaContent() {
 
           if (savedMap) {
             const parsedMap: Record<string, WeekSchedule> = JSON.parse(savedMap);
-            if (token) {
+            // 4a. Busca pelo weekId correspondente
+            if (semanaParam && parsedMap[semanaParam] && parsedMap[semanaParam].isPublished && parsedMap[semanaParam].isPublicShareEnabled) {
+              resolvedSchedule = parsedMap[semanaParam];
+            }
+            // 4b. Busca pelo token
+            if (!resolvedSchedule && token) {
               const matched = Object.values(parsedMap).find(
                 s => (s.shareToken === token || s.weekId === token) && s.isPublished && s.isPublicShareEnabled
               );
               if (matched) resolvedSchedule = matched;
             }
+            // 4c. Qualquer publicada
             if (!resolvedSchedule) {
               const anyPublished = Object.values(parsedMap).find(
                 s => s.isPublished && s.isPublicShareEnabled
@@ -114,7 +137,7 @@ function EscalaPublicaContent() {
         }
       }
 
-      // 4. Carrega colaboradores locais se a nuvem não tiver retornado
+      // 5. Carrega colaboradores locais se a nuvem não tiver retornado
       if (resolvedEmployees.length === 0) {
         try {
           const savedEmployees = localStorage.getItem('iloc_employees');
@@ -124,17 +147,19 @@ function EscalaPublicaContent() {
         } catch {}
       }
 
-      // 5. Finaliza estado
+      // 6. Finaliza estado
       if (resolvedSchedule && resolvedSchedule.isPublished && resolvedSchedule.isPublicShareEnabled) {
         setSchedule(resolvedSchedule);
         setEmployees(resolvedEmployees);
         setNotFound(false);
 
-        // Ajusta dia selecionado para o dia de hoje da escala carregada
+        // Ajusta dia selecionado para o dia de hoje se estiver dentro da semana da escala
         const schedDays = getWeekDays(resolvedSchedule.startDate, todayStr);
         const todayIdx = schedDays.findIndex(d => d.isToday);
         if (todayIdx !== -1) {
           setSelectedDayIdx(todayIdx);
+        } else {
+          setSelectedDayIdx(0);
         }
       } else {
         setNotFound(true);
@@ -144,7 +169,7 @@ function EscalaPublicaContent() {
     };
 
     loadSchedule();
-  }, [token, todayStr]);
+  }, [token, semanaParam, todayStr]);
 
   const activeEmployees = employees.filter(e => e.status === 'active');
   const selectedDay = days[selectedDayIdx] || days[0];
@@ -192,7 +217,7 @@ function EscalaPublicaContent() {
             O compartilhamento público desta escala foi desativado ou aguarda publicação pelo administrador da filial.
           </p>
           <span className="text-[11px] text-slate-400 mt-2">
-            Folgas iLoc • Filial Central
+            Escalas iLoc • Filial Central
           </span>
         </div>
       </div>
@@ -210,7 +235,7 @@ function EscalaPublicaContent() {
             </div>
             <div className="flex flex-col">
               <span className="text-sm font-bold text-slate-900 leading-tight">
-                Folgas iLoc
+                Escalas iLoc
               </span>
               <span className="text-[11px] text-slate-500 flex items-center gap-1">
                 <Building2 className="w-3 h-3 text-slate-400" />
@@ -406,7 +431,7 @@ function EscalaPublicaContent() {
         {/* Rodapé Informativo Público */}
         <footer className="pt-4 pb-2 border-t border-slate-200 text-center flex flex-col items-center gap-1">
           <p className="text-[11px] text-slate-500 font-medium">
-            Escala oficial gerada e homologada via Folgas iLoc.
+            Escala oficial gerada e homologada via Escalas iLoc.
           </p>
           <span className="text-[10px] text-slate-400">
             Filial Central • Atualizado em tempo real

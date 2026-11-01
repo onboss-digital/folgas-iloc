@@ -97,7 +97,7 @@ export function Header({
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="font-bold text-base text-slate-900 tracking-tight truncate">
-                Folgas iLoc
+                Escalas iLoc
               </span>
               {currentUser && (
                 <span

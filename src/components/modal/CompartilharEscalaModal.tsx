@@ -12,6 +12,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { WeekSchedule } from '../../types';
+import { buildPublicScheduleUrl } from '../../lib/scheduleEngine';
 
 interface CompartilharEscalaModalProps {
   isOpen: boolean;
@@ -59,7 +60,7 @@ export function CompartilharEscalaModal({
   const handleShareWhatsApp = () => {
     if (!isPublishedAndActive) return;
     const text = encodeURIComponent(
-      `Escala de Trabalho - Folgas iLoc:\nConfira os dias e turnos de trabalho atualizados no link:\n${shareUrl}`
+      `Escala de Trabalho - Escalas iLoc:\nConfira os dias e turnos de trabalho atualizados no link:\n${shareUrl}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
