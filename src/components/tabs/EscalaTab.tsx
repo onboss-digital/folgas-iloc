@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Eye,
   Edit3,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { Employee, WeekSchedule, CompanySettings, DayInfo, AuthUser, ShiftSwapRequest } from '../../types';
 import { formatNameAndSurname, getEmployeeDayHours } from '../../lib/scheduleEngine';
@@ -242,8 +243,9 @@ export function EscalaTab({
             <button
               type="button"
               onClick={onOpenSolicitarTroca}
-              className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all"
+              className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all"
             >
+              <ArrowLeftRight className="w-3.5 h-3.5 text-white" />
               <span>Solicitar Troca de Escala</span>
             </button>
           )}
@@ -516,9 +518,16 @@ export function EscalaTab({
                         </div>
 
                         <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-bold text-slate-900 truncate">
-                            {formatNameAndSurname(emp.name)}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-bold text-slate-900 truncate">
+                              {formatNameAndSurname(emp.name)}
+                            </span>
+                            {emp.id === loggedEmp?.id && (
+                              <span className="px-1.5 py-0.2 rounded bg-blue-100 text-blue-700 text-[10px] font-black">
+                                Você
+                              </span>
+                            )}
+                          </div>
                           <span className="text-xs text-slate-500 truncate">
                             {emp.role}
                           </span>

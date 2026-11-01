@@ -757,6 +757,9 @@ export default function Home() {
             todayIndex={todayIndex}
             todayStr={todayStr}
             currentUser={currentUser}
+            shiftSwaps={shiftSwaps}
+            onOpenSolicitarTroca={() => setIsSolicitarTrocaOpen(true)}
+            onOpenMinhasTrocas={() => setIsMinhasTrocasOpen(true)}
           />
         )}
 
@@ -781,6 +784,10 @@ export default function Home() {
             isScheduleCreated={Boolean(schedulesMap[currentWeekInfo.weekId])}
             onCreateScheduleForWeek={handleCreateScheduleForWeek}
             onNavigateToAjustes={() => setActiveTab('ajustes')}
+            shiftSwaps={shiftSwaps}
+            onOpenAdminTrocas={() => setIsAdminTrocasOpen(true)}
+            onOpenSolicitarTroca={() => setIsSolicitarTrocaOpen(true)}
+            onOpenMinhasTrocas={() => setIsMinhasTrocasOpen(true)}
           />
         )}
 
