@@ -3,8 +3,8 @@
 @layer base {
   :root {
     --font-sans: var(--font-plus-jakarta), system-ui, -apple-system, sans-serif;
-    --background: #FAF8FF;
-    --foreground: #131B2E;
+    --background: #F8FAFC;
+    --foreground: #0F172A;
   }
 
   html,
@@ -12,8 +12,8 @@
     width: 100%;
     margin: 0;
     padding: 0;
-    background-color: #FAF8FF;
-    color: #131B2E;
+    background-color: #F8FAFC;
+    color: #0F172A;
     font-family: var(--font-sans);
     overscroll-behavior-y: none;
     -webkit-tap-highlight-color: transparent;

@@ -1,15 +1,44 @@
 import { Employee, ShiftStatus, WeekSchedule, CompanySettings, DayInfo } from '../types';
+import { getHolidayInfo } from './holidays';
 
 export const DAY_NAMES = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'] as const;
 
+export function formatNameAndSurname(name: string): string {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length <= 2) return name;
+  return `${parts[0]} ${parts[parts.length - 1]}`;
+}
+
+export const ADMIN_EMAIL = 'luizstaff@ilocmobile.com.br';
+
 export const INITIAL_EMPLOYEES: Employee[] = [
   {
-    id: 'carlos',
-    name: 'Carlos Eduardo Mendes',
-    role: 'Operador Líder de Turno',
+    id: 'thiago',
+    name: 'Thiago Oliveira',
+    email: 'thiago@ilocmobile.com.br',
+    role: 'Especialista de Atendimento',
+    team: 'Operações de Loja',
+    workHours: '08:00 às 17:00',
     status: 'active',
-    initials: 'CE',
+    initials: 'TO',
+    avatarUrl: '',
     colorBg: 'bg-blue-600',
+    admissionDate: '2023-05-12',
+    preferredDaysOff: [5, 6], // Sáb, Dom
+    notes: 'Colaborador teste de referência para visualização do portal',
+  },
+  {
+    id: 'carlos',
+    name: 'Carlos Mendes',
+    email: 'carlos@ilocmobile.com.br',
+    role: 'Operador Líder de Turno',
+    team: 'Operações de Loja',
+    workHours: '08:00 às 17:00',
+    status: 'active',
+    initials: 'CM',
+    avatarUrl: '',
+    colorBg: 'bg-indigo-600',
     admissionDate: '2023-03-15',
     preferredDaysOff: [5, 6], // Sáb, Dom
     notes: 'Disponibilidade total para turnos matutinos',
@@ -17,9 +46,13 @@ export const INITIAL_EMPLOYEES: Employee[] = [
   {
     id: 'pedro',
     name: 'Pedro Santos',
+    email: 'pedro@ilocmobile.com.br',
     role: 'Atendente / Caixa',
+    team: 'Operações de Loja',
+    workHours: '08:00 às 17:00',
     status: 'active',
     initials: 'PS',
+    avatarUrl: '',
     colorBg: 'bg-emerald-600',
     admissionDate: '2023-08-01',
     preferredDaysOff: [0, 1], // Seg, Ter
@@ -28,9 +61,13 @@ export const INITIAL_EMPLOYEES: Employee[] = [
   {
     id: 'joao',
     name: 'João Silva',
+    email: 'joao@ilocmobile.com.br',
     role: 'Vendedor Responsável',
+    team: 'Vendas e Atendimento',
+    workHours: '09:00 às 18:00',
     status: 'active',
     initials: 'JS',
+    avatarUrl: '',
     colorBg: 'bg-amber-600',
     admissionDate: '2022-11-10',
     preferredDaysOff: [4, 5], // Sex, Sáb
@@ -38,14 +75,33 @@ export const INITIAL_EMPLOYEES: Employee[] = [
   },
   {
     id: 'paulo',
-    name: 'Paulo Roberto Silva',
+    name: 'Paulo Silva',
+    email: 'paulo@ilocmobile.com.br',
     role: 'Assistente de Logística',
+    team: 'Logística e Estoque',
+    workHours: '07:00 às 16:00',
     status: 'active',
-    initials: 'PR',
-    colorBg: 'bg-indigo-600',
+    initials: 'PS',
+    avatarUrl: '',
+    colorBg: 'bg-violet-600',
     admissionDate: '2024-01-20',
     preferredDaysOff: [2, 3], // Qua, Qui
     notes: 'Apoio em estoque e conferência',
+  },
+  {
+    id: 'mariana',
+    name: 'Mariana Souza',
+    email: 'mariana@ilocmobile.com.br',
+    role: 'Apoio Administrativo',
+    team: '',
+    workHours: '08:00 às 17:00',
+    status: 'active',
+    initials: 'MS',
+    avatarUrl: '',
+    colorBg: 'bg-teal-600',
+    admissionDate: '2024-05-10',
+    preferredDaysOff: [0, 6],
+    notes: 'Aguardando alocação em equipe',
   },
 ];
 
@@ -56,6 +112,7 @@ export const INITIAL_SETTINGS: CompanySettings = {
   weeklyRestDays: 2,
   rotateShifts: true,
   rotateSundays: true,
+  operatesOnHolidays: true,
   startDay: 1, // Segunda-feira
 };
 
@@ -66,13 +123,110 @@ export const INITIAL_WEEK_SCHEDULE: WeekSchedule = {
   startDate: '2026-10-26',
   endDate: '2026-11-01',
   isPublished: true,
+  isPublicShareEnabled: true,
+  shareToken: 'escala-semana-44',
+  publishedAt: '2026-10-26T08:00:00Z',
   shifts: {
+    thiago: ['T', 'T', 'T', 'T', 'T', 'F', 'F'], // Folga Sáb, Dom
     carlos: ['T', 'T', 'T', 'T', 'T', 'F', 'F'], // Folga Sáb, Dom
     pedro: ['F', 'F', 'T', 'T', 'T', 'T', 'T'], // Folga Seg, Ter
     joao: ['T', 'T', 'F', 'F', 'T', 'T', 'T'], // Folga Qua, Qui
     paulo: ['T', 'T', 'T', 'T', 'F', 'F', 'T'], // Folga Sex, Sáb
+    mariana: ['F', 'T', 'T', 'T', 'T', 'T', 'F'], // Folga Seg, Dom
+  },
+  customHours: {
+    thiago: ['08:00 às 17:00', '08:00 às 17:00', '08:00 às 17:00', '08:00 às 17:00', '08:00 às 17:00', undefined, undefined],
+    carlos: ['08:00 às 17:00', '08:00 às 17:00', '08:00 às 17:00', '08:00 às 17:00', '08:00 às 17:00', undefined, undefined],
+    pedro: [undefined, undefined, '12:00 às 21:00', '12:00 às 21:00', '12:00 às 21:00', '12:00 às 21:00', '12:00 às 21:00'],
+    joao: ['09:00 às 18:00', '09:00 às 18:00', undefined, undefined, '09:00 às 18:00', '09:00 às 18:00', '09:00 às 18:00'],
+    paulo: ['07:00 às 16:00', '07:00 às 16:00', '07:00 às 16:00', '07:00 às 16:00', undefined, undefined, '07:00 às 16:00'],
+    mariana: [undefined, '08:00 às 17:00', '08:00 às 17:00', '08:00 às 17:00', '08:00 às 17:00', '08:00 às 17:00', undefined],
   },
 };
+
+export const INITIAL_SCHEDULE_HISTORY: Record<string, WeekSchedule> = {
+  '2026-W42': {
+    weekId: '2026-W42',
+    weekNumber: 42,
+    year: 2026,
+    startDate: '2026-10-12',
+    endDate: '2026-10-18',
+    isPublished: true,
+    isPublicShareEnabled: true,
+    publishedAt: '2026-10-12T08:00:00Z',
+    shifts: {
+      thiago: ['T', 'T', 'T', 'T', 'T', 'F', 'F'],
+      carlos: ['T', 'T', 'T', 'T', 'T', 'F', 'F'],
+      pedro: ['F', 'F', 'T', 'T', 'T', 'T', 'T'],
+      joao: ['T', 'T', 'F', 'F', 'T', 'T', 'T'],
+      paulo: ['T', 'T', 'T', 'T', 'F', 'F', 'T'],
+      mariana: ['F', 'T', 'T', 'T', 'T', 'T', 'F'],
+    },
+  },
+  '2026-W43': {
+    weekId: '2026-W43',
+    weekNumber: 43,
+    year: 2026,
+    startDate: '2026-10-19',
+    endDate: '2026-10-25',
+    isPublished: true,
+    isPublicShareEnabled: true,
+    publishedAt: '2026-10-19T08:00:00Z',
+    shifts: {
+      thiago: ['T', 'T', 'T', 'T', 'F', 'T', 'F'],
+      carlos: ['F', 'F', 'T', 'T', 'T', 'T', 'T'],
+      pedro: ['T', 'T', 'F', 'F', 'T', 'T', 'T'],
+      joao: ['T', 'T', 'T', 'T', 'F', 'F', 'T'],
+      paulo: ['T', 'T', 'T', 'T', 'T', 'F', 'F'],
+      mariana: ['T', 'F', 'F', 'T', 'T', 'T', 'T'],
+    },
+  },
+  '2026-W44': INITIAL_WEEK_SCHEDULE,
+  '2026-W45': {
+    weekId: '2026-W45',
+    weekNumber: 45,
+    year: 2026,
+    startDate: '2026-11-02',
+    endDate: '2026-11-08',
+    isPublished: true,
+    isPublicShareEnabled: true,
+    publishedAt: '2026-10-30T10:00:00Z',
+    shifts: {
+      thiago: ['T', 'T', 'T', 'T', 'T', 'F', 'F'],
+      carlos: ['T', 'T', 'F', 'F', 'T', 'T', 'T'],
+      pedro: ['T', 'T', 'T', 'T', 'F', 'F', 'T'],
+      joao: ['T', 'T', 'T', 'T', 'T', 'F', 'F'],
+      paulo: ['F', 'F', 'T', 'T', 'T', 'T', 'T'],
+      mariana: ['T', 'T', 'T', 'F', 'F', 'T', 'T'],
+    },
+  },
+};
+
+export function getWeekDateRange(weekOffset: number) {
+  const base = new Date(2026, 9, 26 + weekOffset * 7);
+  const yyyy = base.getFullYear();
+  const mm = String(base.getMonth() + 1).padStart(2, '0');
+  const dd = String(base.getDate()).padStart(2, '0');
+  const startDateStr = `${yyyy}-${mm}-${dd}`;
+
+  const endDate = new Date(base);
+  endDate.setDate(base.getDate() + 6);
+  const endY = endDate.getFullYear();
+  const endM = String(endDate.getMonth() + 1).padStart(2, '0');
+  const endD = String(endDate.getDate()).padStart(2, '0');
+  const endDateStr = `${endY}-${endM}-${endD}`;
+
+  const weekNumber = 44 + weekOffset;
+  const weekId = `${yyyy}-W${weekNumber}`;
+
+  return {
+    startDateStr,
+    endDateStr,
+    weekNumber,
+    weekId,
+    periodText: `${dd}/${mm} a ${endD}/${endM}/${endY}`,
+  };
+}
 
 export function getWeekDays(startDateStr: string, todayStr?: string): DayInfo[] {
   const parts = startDateStr.split('-').map(Number);
@@ -85,6 +239,7 @@ export function getWeekDays(startDateStr: string, todayStr?: string): DayInfo[] 
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     const fullDate = `${yyyy}-${mm}-${dd}`;
+    const holidayInfo = getHolidayInfo(fullDate);
 
     return {
       index: i,
@@ -94,6 +249,8 @@ export function getWeekDays(startDateStr: string, todayStr?: string): DayInfo[] 
       dayNumber: d.getDate(),
       isWeekend: i === 5 || i === 6,
       isToday: todayStr ? fullDate === todayStr : i === 3,
+      isHoliday: holidayInfo.isHoliday,
+      holidayName: holidayInfo.holidayName,
     };
   });
 }
@@ -129,17 +286,36 @@ export function calculateDailyCoverage(
 export function calculateEmployeeSummary(shifts: ShiftStatus[]) {
   let workCount = 0;
   let offCount = 0;
+  let absenceCount = 0;
+  let unassignedCount = 0;
 
   shifts.forEach(st => {
     if (st === 'T') workCount++;
+    else if (st === 'F') offCount++;
+    else if (st === 'AUSENTE' || st === 'FERIAS' || st === 'AFASTADO') absenceCount++;
+    else if (st === 'SEM_ESCALA') unassignedCount++;
     else offCount++;
   });
 
   return {
     workCount,
     offCount,
+    absenceCount,
+    unassignedCount,
     isCompliant: workCount === 5 && offCount === 2,
   };
+}
+
+export function getEmployeeDayHours(
+  schedule: WeekSchedule,
+  emp: Employee,
+  dayIdx: number
+): string {
+  const custom = schedule.customHours?.[emp.id]?.[dayIdx];
+  if (custom && custom.trim() !== '') {
+    return custom;
+  }
+  return emp.workHours || '08:00 às 17:00';
 }
 
 /**

@@ -34,8 +34,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" className={`${plusJakarta.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-[#FAF8FF] text-[#131B2E] font-sans antialiased select-none pb-safe">
+    <html lang="pt-BR" className={`${plusJakarta.variable} h-full antialiased`} suppressHydrationWarning>
+      <body
+        className="min-h-full flex flex-col bg-slate-50 text-slate-900 font-sans antialiased select-none pb-safe"
+        suppressHydrationWarning
+      >
         {children}
       </body>
     </html>
