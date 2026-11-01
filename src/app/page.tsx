@@ -89,11 +89,45 @@ export default function Home() {
         const d = String(now.getDate()).padStart(2, '0');
         setTodayStr(`${y}-${m}-${d}`);
 
-        // 1. Recupera sessão salva
+        // 1. Limpeza automática imediata de dados mock/demo legados do navegador
+        const legacyMockIds = ['thiago', 'carlos', 'pedro', 'joao', 'paulo', 'mariana'];
+        const savedEmployeesRaw = localStorage.getItem('iloc_employees');
+        let hasLegacyMocks = false;
+        if (savedEmployeesRaw) {
+          try {
+            const parsed = JSON.parse(savedEmployeesRaw);
+            if (Array.isArray(parsed) && parsed.some(e => legacyMockIds.includes(e?.id))) {
+              hasLegacyMocks = true;
+            }
+          } catch {}
+        }
+
+        if (hasLegacyMocks) {
+          localStorage.removeItem('iloc_employees');
+          localStorage.removeItem('iloc_schedules_map');
+          localStorage.removeItem('iloc_schedule');
+          const savedAuthRaw = localStorage.getItem('iloc_auth_user');
+          if (savedAuthRaw) {
+            try {
+              const parsedAuth = JSON.parse(savedAuthRaw);
+              if (legacyMockIds.includes(parsedAuth?.id)) {
+                localStorage.removeItem('iloc_auth_user');
+              }
+            } catch {}
+          }
+        }
+
+        // 2. Recupera sessão salva
         const savedAuth = localStorage.getItem('iloc_auth_user');
         if (savedAuth) {
           try {
-            setCurrentUser(JSON.parse(savedAuth));
+            const parsed = JSON.parse(savedAuth);
+            if (legacyMockIds.includes(parsed?.id)) {
+              localStorage.removeItem('iloc_auth_user');
+              setCurrentUser(null);
+            } else {
+              setCurrentUser(parsed);
+            }
           } catch {
             setCurrentUser(null);
           }
@@ -101,7 +135,7 @@ export default function Home() {
           setCurrentUser(null);
         }
 
-        // 2. Carrega configurações
+        // 3. Carrega configurações
         const savedSettings = localStorage.getItem('iloc_settings');
         if (savedSettings) {
           try {
@@ -113,7 +147,7 @@ export default function Home() {
           setSettings(cloudSettings);
         }
 
-        // 3. Carrega colaboradores
+        // 4. Carrega colaboradores
         let loadedEmployees: Employee[] = [];
         const savedEmployees = localStorage.getItem('iloc_employees');
         if (savedEmployees) {
@@ -123,15 +157,14 @@ export default function Home() {
         }
 
         const cloudEmployees = await fetchEmployeesFromSupabase();
-        if (cloudEmployees && cloudEmployees.length > 0) {
+        if (cloudEmployees !== null) {
+          // Supabase é a fonte da verdade definitiva
           loadedEmployees = cloudEmployees;
           localStorage.setItem('iloc_employees', JSON.stringify(cloudEmployees));
-        } else if (!savedEmployees) {
-          loadedEmployees = [];
         }
         setEmployees(loadedEmployees);
 
-        // 4. Carrega escalas
+        // 5. Carrega escalas
         let loadedMap: Record<string, WeekSchedule> = {};
         const savedMap = localStorage.getItem('iloc_schedules_map');
         if (savedMap) {

@@ -12,8 +12,6 @@ import {
 } from 'lucide-react';
 import { Employee, WeekSchedule, DayInfo } from '../../types';
 import {
-  INITIAL_EMPLOYEES,
-  INITIAL_WEEK_SCHEDULE,
   getWeekDays,
   formatNameAndSurname,
   getEmployeeDayHours,
@@ -25,8 +23,18 @@ function EscalaPublicaContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
-  const [schedule, setSchedule] = useState<WeekSchedule>(INITIAL_WEEK_SCHEDULE);
-  const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
+  const [schedule, setSchedule] = useState<WeekSchedule>({
+    weekId: '',
+    weekNumber: 1,
+    year: 2026,
+    startDate: '',
+    endDate: '',
+    isPublished: false,
+    isPublicShareEnabled: false,
+    shifts: {},
+    customHours: {},
+  });
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedDayIdx, setSelectedDayIdx] = useState<number>(3);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [notFound, setNotFound] = useState<boolean>(false);
