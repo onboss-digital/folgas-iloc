@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Employee, AuthUser, WeekSchedule, CompanySettings, ShiftSwapRequest } from '../types';
+import { Employee, AuthUser, WeekSchedule, CompanySettings, ShiftSwapRequest, AppNotification, WorkModel } from '../types';
 import { ADMIN_EMAIL } from './scheduleEngine';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -110,6 +110,7 @@ export async function inviteAndRegisterCollaborator({
   team = 'Operações de Loja',
   role = 'Colaborador',
   workHours = '08:00 às 17:00',
+  workModel = 'presencial',
   currentAdminEmail,
 }: {
   name: string;
@@ -118,6 +119,7 @@ export async function inviteAndRegisterCollaborator({
   team?: string;
   role?: string;
   workHours?: string;
+  workModel?: WorkModel;
   currentAdminEmail: string;
 }): Promise<{ employee: Employee | null; error: string | null }> {
   const cleanAdmin = currentAdminEmail.trim().toLowerCase();
@@ -138,6 +140,7 @@ export async function inviteAndRegisterCollaborator({
     role,
     team,
     workHours,
+    workModel,
     status: 'active',
     initials: cleanName
       .split(' ')
@@ -182,6 +185,7 @@ export async function inviteAndRegisterCollaborator({
         role: newEmployee.role,
         team: newEmployee.team,
         work_hours: newEmployee.workHours,
+        work_model: newEmployee.workModel || 'presencial',
         status: newEmployee.status,
       });
 
@@ -295,6 +299,7 @@ export async function fetchEmployeesFromSupabase(): Promise<Employee[] | null> {
       colorBg: row.color_bg || 'bg-blue-600',
       admissionDate: row.admission_date || '',
       preferredDaysOff: row.preferred_days_off || [5, 6],
+      workModel: row.work_model || 'presencial',
       notes: row.notes || '',
     }));
   } catch (err) {
@@ -330,6 +335,7 @@ export async function fetchScheduleFromSupabase(weekId: string): Promise<WeekSch
       shareToken: data.share_token,
       shifts: data.shifts || {},
       customHours: data.custom_hours || {},
+      workModels: data.work_models || {},
     };
   } catch (err) {
     console.warn('Exceção ao carregar escala do Supabase:', err);
@@ -356,6 +362,7 @@ export async function saveScheduleToSupabase(schedule: WeekSchedule): Promise<bo
       share_token: schedule.shareToken || null,
       shifts: schedule.shifts,
       custom_hours: schedule.customHours || {},
+      work_models: schedule.workModels || {},
       updated_at: new Date().toISOString(),
     });
 
@@ -426,6 +433,7 @@ export async function fetchPublicScheduleByToken(token: string): Promise<{
       shareToken: schedData.share_token,
       shifts: schedData.shifts || {},
       customHours: schedData.custom_hours || {},
+      workModels: schedData.work_models || {},
     };
 
     return { schedule: formattedSchedule, employees: formattedEmps };
@@ -526,6 +534,7 @@ export async function fetchSettingsFromSupabase(): Promise<CompanySettings | nul
       rotateSundays: data.rotate_sundays,
       operatesOnHolidays: data.operates_on_holidays,
       startDay: data.start_day,
+      timezonePreference: data.timezone_preference || 'brasilia',
     };
   } catch (err) {
     console.warn('Exceção ao carregar configurações do Supabase:', err);
@@ -550,6 +559,7 @@ export async function saveSettingsToSupabase(settings: CompanySettings): Promise
       rotate_sundays: settings.rotateSundays,
       operates_on_holidays: settings.operatesOnHolidays ?? true,
       start_day: settings.startDay,
+      timezone_preference: settings.timezonePreference || 'brasilia',
       updated_at: new Date().toISOString(),
     });
 
@@ -724,5 +734,123 @@ export async function fetchPublicScheduleByWeekId(weekId: string): Promise<{
   } catch (err) {
     console.warn('Exceção ao buscar escala pública por weekId no Supabase:', err);
     return { schedule: null, employees: null };
+  }
+}
+
+/**
+ * Consultar notificações direcionadas ao usuário logado ou à administração
+ */
+export async function fetchNotificationsFromSupabase(
+  recipientId: string,
+  isAdmin: boolean = false
+): Promise<AppNotification[]> {
+  if (!isSupabaseConfigured() || !supabase) return [];
+
+  try {
+    let query = supabase
+      .from('notifications')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(60);
+
+    if (isAdmin) {
+      query = query.or(`recipient_id.eq.${recipientId},recipient_id.eq.admin,recipient_role.eq.admin,recipient_role.eq.all`);
+    } else {
+      query = query.or(`recipient_id.eq.${recipientId},recipient_role.eq.all`);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) {
+      console.warn('Aviso ao consultar notificações no Supabase:', error?.message);
+      return [];
+    }
+
+    return data.map((row: any) => ({
+      id: row.id,
+      recipientId: row.recipient_id,
+      recipientRole: row.recipient_role || 'colaborador',
+      type: row.type,
+      title: row.title,
+      message: row.message,
+      relatedSwapId: row.related_swap_id || undefined,
+      relatedWeekId: row.related_week_id || undefined,
+      read: Boolean(row.read),
+      createdAt: row.created_at,
+    }));
+  } catch (err) {
+    console.warn('Exceção ao consultar notificações:', err);
+    return [];
+  }
+}
+
+/**
+ * Salvar ou disparar nova notificação no Supabase
+ */
+export async function saveNotificationToSupabase(
+  notif: AppNotification
+): Promise<{ error: string | null }> {
+  if (!isSupabaseConfigured() || !supabase) return { error: null };
+
+  try {
+    const { error } = await supabase.from('notifications').upsert({
+      id: notif.id,
+      recipient_id: notif.recipientId,
+      recipient_role: notif.recipientRole || 'colaborador',
+      type: notif.type,
+      title: notif.title,
+      message: notif.message,
+      related_swap_id: notif.relatedSwapId || null,
+      related_week_id: notif.relatedWeekId || null,
+      read: notif.read,
+      created_at: notif.createdAt,
+    });
+
+    if (error) {
+      console.warn('Erro ao salvar notificação no Supabase:', error.message);
+      return { error: error.message };
+    }
+    return { error: null };
+  } catch (err: any) {
+    return { error: err.message || 'Falha ao salvar notificação.' };
+  }
+}
+
+/**
+ * Marcar notificação individual como lida
+ */
+export async function markNotificationAsReadInSupabase(notificationId: string): Promise<boolean> {
+  if (!isSupabaseConfigured() || !supabase) return true;
+
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('id', notificationId);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Marcar todas as notificações do usuário como lidas
+ */
+export async function markAllNotificationsAsReadInSupabase(
+  recipientId: string,
+  isAdmin: boolean = false
+): Promise<boolean> {
+  if (!isSupabaseConfigured() || !supabase) return true;
+
+  try {
+    let query = supabase.from('notifications').update({ read: true });
+    if (isAdmin) {
+      query = query.or(`recipient_id.eq.${recipientId},recipient_id.eq.admin,recipient_role.eq.admin`);
+    } else {
+      query = query.eq('recipient_id', recipientId);
+    }
+    const { error } = await query;
+    return !error;
+  } catch {
+    return false;
   }
 }

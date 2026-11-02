@@ -33,6 +33,7 @@ import {
   CompanySettings,
   AuthUser,
   ShiftSwapRequest,
+  WorkModel,
 } from '../../types';
 import {
   formatNameAndSurname,
@@ -71,6 +72,7 @@ interface QuickDayEditor {
   status: ShiftStatus;
   entryTime: string;
   exitTime: string;
+  workModel?: WorkModel;
   applyToAllWorkDays?: boolean;
 }
 
@@ -190,6 +192,7 @@ export function GerenciarEscalasTab({
   const [empTeam, setEmpTeam] = useState('Operações de Loja');
   const [empStartTime, setEmpStartTime] = useState('08:00');
   const [empEndTime, setEmpEndTime] = useState('17:00');
+  const [empWorkModel, setEmpWorkModel] = useState<WorkModel>('presencial');
 
   // Confirmação de exclusão de colaborador
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
@@ -215,6 +218,7 @@ export function GerenciarEscalasTab({
     setEmpTeam(selectedTeam !== 'todas' ? selectedTeam : 'Operações de Loja');
     setEmpStartTime('08:00');
     setEmpEndTime('17:00');
+    setEmpWorkModel('presencial');
     setIsEmployeeModalOpen(true);
   };
 
@@ -235,6 +239,7 @@ export function GerenciarEscalasTab({
     }
     setEmpStartTime(start);
     setEmpEndTime(end);
+    setEmpWorkModel(emp.workModel || 'presencial');
     setIsEmployeeModalOpen(true);
   };
 
@@ -256,6 +261,7 @@ export function GerenciarEscalasTab({
           role: cleanRole,
           team: cleanTeam,
           workHours: workHoursFormatted,
+          workModel: empWorkModel,
         });
       }
     } else {
@@ -275,6 +281,7 @@ export function GerenciarEscalasTab({
           role: cleanRole,
           team: cleanTeam,
           workHours: workHoursFormatted,
+          workModel: empWorkModel,
           status: 'active',
           initials,
           colorBg,
@@ -303,12 +310,16 @@ export function GerenciarEscalasTab({
       if (parts[1]) exit = parts[1];
     }
 
+    const currentModel: WorkModel =
+      schedule.workModels?.[emp.id]?.[dayIdx] || emp.workModel || 'presencial';
+
     setQuickEditor({
       employeeId: emp.id,
       dayIndex: dayIdx,
       status: currentStatus,
       entryTime: entry,
       exitTime: exit,
+      workModel: currentModel,
     });
   };
 
@@ -317,13 +328,15 @@ export function GerenciarEscalasTab({
     newStatus: ShiftStatus,
     entry?: string,
     exit?: string,
-    applyToAll?: boolean
+    applyToAll?: boolean,
+    model?: WorkModel
   ) => {
     if (!quickEditor) return;
 
     const { employeeId, dayIndex } = quickEditor;
     const finalEntry = entry || quickEditor.entryTime;
     const finalExit = exit || quickEditor.exitTime;
+    const finalModel = model || quickEditor.workModel || 'presencial';
     const hoursFormatted = `${finalEntry} às ${finalExit}`;
 
     const currentShifts = [
@@ -335,10 +348,16 @@ export function GerenciarEscalasTab({
       ...(schedule.customHours?.[employeeId] || Array(7).fill(undefined)),
     ];
 
+    const currentWorkModels = [
+      ...(schedule.workModels?.[employeeId] || Array(7).fill(undefined)),
+    ];
+
     if (newStatus === 'T') {
       currentCustom[dayIndex] = hoursFormatted;
+      currentWorkModels[dayIndex] = finalModel;
     } else {
       currentCustom[dayIndex] = undefined;
+      currentWorkModels[dayIndex] = undefined;
     }
 
     const shouldApplyAll = applyToAll !== undefined ? applyToAll : quickEditor.applyToAllWorkDays;
@@ -346,6 +365,7 @@ export function GerenciarEscalasTab({
       for (let i = 0; i < 7; i++) {
         if (currentShifts[i] === 'T') {
           currentCustom[i] = hoursFormatted;
+          currentWorkModels[i] = finalModel;
         }
       }
     }
@@ -359,6 +379,10 @@ export function GerenciarEscalasTab({
       customHours: {
         ...(schedule.customHours || {}),
         [employeeId]: currentCustom,
+      },
+      workModels: {
+        ...(schedule.workModels || {}),
+        [employeeId]: currentWorkModels,
       },
     };
 
@@ -380,10 +404,16 @@ export function GerenciarEscalasTab({
     const currentCustom = [
       ...(schedule.customHours?.[emp.id] || Array(7).fill(undefined)),
     ];
+    const currentWorkModels = [
+      ...(schedule.workModels?.[emp.id] || Array(7).fill(undefined)),
+    ];
+
     if (nextStatus === 'T') {
       currentCustom[dayIdx] = emp.workHours || '08:00 às 17:00';
+      currentWorkModels[dayIdx] = emp.workModel || 'presencial';
     } else {
       currentCustom[dayIdx] = undefined;
+      currentWorkModels[dayIdx] = undefined;
     }
 
     const updatedSchedule: WeekSchedule = {
@@ -395,6 +425,10 @@ export function GerenciarEscalasTab({
       customHours: {
         ...(schedule.customHours || {}),
         [emp.id]: currentCustom,
+      },
+      workModels: {
+        ...(schedule.workModels || {}),
+        [emp.id]: currentWorkModels,
       },
     };
 
@@ -1170,6 +1204,36 @@ export function GerenciarEscalasTab({
                   </div>
                 </div>
 
+                {/* Modalidade de Trabalho */}
+                <div className="flex flex-col gap-1.5 pt-1 border-t border-emerald-200/60">
+                  <span className="text-[10px] font-bold text-emerald-950 uppercase">
+                    Modalidade de Trabalho:
+                  </span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { id: 'presencial', label: 'Presencial' },
+                      { id: 'home_office', label: 'Home office' },
+                      { id: 'hibrido', label: 'Híbrido' },
+                    ].map(m => {
+                      const isSel = (quickEditor.workModel || 'presencial') === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setQuickEditor({ ...quickEditor, workModel: m.id as WorkModel })}
+                          className={`py-1.5 px-2 rounded-xl text-xs font-bold border transition-all text-center ${
+                            isSel
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Chips de Horários Frequentes */}
                 <div className="flex flex-col gap-1 pt-1 border-t border-emerald-200/60">
                   <span className="text-[10px] font-bold text-emerald-900">
@@ -1498,6 +1562,36 @@ export function GerenciarEscalasTab({
                   placeholder="Ex: Operações de Loja, Vendas, Estoque..."
                   className="w-full h-11 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                 />
+              </div>
+
+              {/* Modalidade de Trabalho Habitual */}
+              <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-100">
+                <label className="text-xs font-semibold text-slate-700">
+                  Modalidade de Trabalho Padrão
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'presencial', label: 'Presencial' },
+                    { id: 'home_office', label: 'Home office' },
+                    { id: 'hibrido', label: 'Híbrido' },
+                  ].map(m => {
+                    const isSel = empWorkModel === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setEmpWorkModel(m.id as WorkModel)}
+                        className={`h-10 px-2 rounded-xl text-xs font-bold border transition-all text-center ${
+                          isSel
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Horário de Trabalho */}

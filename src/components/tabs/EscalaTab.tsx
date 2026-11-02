@@ -228,8 +228,8 @@ export function EscalaTab({
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 Escala do Time • {selectedTeam || 'Operações de Loja'}
               </span>
-              <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px] font-mono font-bold">
-                BRT
+              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold">
+                {settings.timezonePreference === 'local' ? 'Horário Local' : 'Horários de Brasília (BRT)'}
               </span>
             </div>
             <h1 className="text-base font-black text-slate-900 tracking-tight">
@@ -528,9 +528,25 @@ export function EscalaTab({
                               </span>
                             )}
                           </div>
-                          <span className="text-xs text-slate-500 truncate">
-                            {emp.role}
-                          </span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-xs text-slate-500 truncate">
+                              {emp.role}
+                            </span>
+                            {(() => {
+                              const empWorkModel = schedule.workModels?.[emp.id]?.[selectedDayIdx] || emp.workModel || 'presencial';
+                              return (
+                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md ${
+                                  empWorkModel === 'home_office'
+                                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                    : empWorkModel === 'hibrido'
+                                    ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                                    : 'bg-slate-100 text-slate-700 border border-slate-200'
+                                }`}>
+                                  {empWorkModel === 'home_office' ? 'Home office' : empWorkModel === 'hibrido' ? 'Híbrido' : 'Presencial'}
+                                </span>
+                              );
+                            })()}
+                          </div>
                         </div>
                       </div>
 

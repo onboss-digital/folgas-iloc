@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ActiveTab, Employee, ShiftStatus, WeekSchedule, CompanySettings, AuthUser, ShiftSwapRequest } from '../types';
+import { ActiveTab, Employee, ShiftStatus, WeekSchedule, CompanySettings, AuthUser, ShiftSwapRequest, AppNotification } from '../types';
 import {
   INITIAL_EMPLOYEES,
   INITIAL_SETTINGS,
@@ -23,10 +23,11 @@ import { CompartilharEscalaModal } from '../components/modal/CompartilharEscalaM
 import { LoginView } from '../components/auth/LoginView';
 import { Toast, ToastMessage } from '../components/Toast';
 import { PerfilView } from '../components/perfil/PerfilView';
-import { getTodayStrBrasilia, getNowIsoBrasilia } from '../lib/dateUtils';
+import { getTodayStr, getNowIso } from '../lib/dateUtils';
 import { SolicitarTrocaModal } from '../components/modal/SolicitarTrocaModal';
 import { MinhasTrocasModal } from '../components/modal/MinhasTrocasModal';
 import { AdminTrocasModal } from '../components/modal/AdminTrocasModal';
+import { NotificacoesModal } from '../components/notifications/NotificacoesModal';
 import {
   updateUserProfile,
   fetchEmployeesFromSupabase,
@@ -36,6 +37,10 @@ import {
   saveSettingsToSupabase,
   fetchShiftSwapsFromSupabase,
   saveShiftSwapToSupabase,
+  fetchNotificationsFromSupabase,
+  saveNotificationToSupabase,
+  markNotificationAsReadInSupabase,
+  markAllNotificationsAsReadInSupabase,
 } from '../lib/supabase';
 
 export default function Home() {
@@ -53,6 +58,24 @@ export default function Home() {
   const [isSolicitarTrocaOpen, setIsSolicitarTrocaOpen] = useState<boolean>(false);
   const [isMinhasTrocasOpen, setIsMinhasTrocasOpen] = useState<boolean>(false);
   const [isAdminTrocasOpen, setIsAdminTrocasOpen] = useState<boolean>(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
+
+  // Identificação do colaborador logado
+  const loggedEmp = employees.find(
+    e => e.id === currentUser?.id || e.email?.toLowerCase() === currentUser?.email?.toLowerCase()
+  );
+  const currentEmpId = loggedEmp?.id || currentUser?.id;
+
+  const userNotifications = notifications.filter(n => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'admin') {
+      return n.recipientId === 'admin' || n.recipientId === currentUser.id;
+    }
+    return n.recipientId === currentEmpId || n.recipientId === currentUser.id;
+  });
+
+  const unreadNotificationsCount = userNotifications.filter(n => !n.read).length;
 
   // Calcula dados da semana atual baseados no weekOffset
   const currentWeekInfo = getWeekDateRange(weekOffset);
@@ -253,11 +276,73 @@ export default function Home() {
     } catch {}
   };
 
+  const dispatchNotification = (
+    notif: Omit<AppNotification, 'id' | 'createdAt' | 'read'>
+  ) => {
+    const newNotification: AppNotification = {
+      ...notif,
+      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      createdAt: getNowIso(settings.timezonePreference),
+      read: false,
+    };
+
+    setNotifications(prev => {
+      const updated = [newNotification, ...prev];
+      try {
+        localStorage.setItem('iloc_notifications', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    saveNotificationToSupabase(newNotification).catch(() => {});
+  };
+
+  const handleMarkNotificationAsRead = async (id: string) => {
+    setNotifications(prev => {
+      const updated = prev.map(n => (n.id === id ? { ...n, read: true } : n));
+      try {
+        localStorage.setItem('iloc_notifications', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    markNotificationAsReadInSupabase(id).catch(() => {});
+  };
+
+  const handleMarkAllNotificationsAsRead = async () => {
+    setNotifications(prev => {
+      const updated = prev.map(n => {
+        const isUserNotif =
+          currentUser?.role === 'admin'
+            ? n.recipientId === 'admin' || n.recipientId === currentUser.id
+            : n.recipientId === currentEmpId || n.recipientId === currentUser?.id;
+        return isUserNotif ? { ...n, read: true } : n;
+      });
+      try {
+        localStorage.setItem('iloc_notifications', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    if (currentUser?.id) {
+      markAllNotificationsAsReadInSupabase(currentUser.id).catch(() => {});
+    }
+  };
+
   const handleCreateShiftSwap = async (newSwap: ShiftSwapRequest) => {
     const updated = [newSwap, ...shiftSwaps];
     persistShiftSwaps(updated);
     saveShiftSwapToSupabase(newSwap).catch(() => {});
     showToast('Solicitação de troca enviada ao colega com sucesso!', 'success');
+
+    // Notifica o colega destinatário da troca
+    dispatchNotification({
+      recipientId: newSwap.targetId,
+      recipientRole: 'colaborador',
+      type: 'swap_requested',
+      title: 'Nova solicitação de troca de escala',
+      message: `${formatNameAndSurname(newSwap.requesterName)} solicitou uma troca de escala com você para a data ${newSwap.targetDayDate || newSwap.requesterDayDate}.`,
+      relatedSwapId: newSwap.id,
+      relatedWeekId: newSwap.weekId,
+    });
   };
 
   const handleRespondShiftSwap = async (
@@ -268,7 +353,7 @@ export default function Home() {
     const swap = shiftSwaps.find(s => s.id === swapId);
     if (!swap) return;
 
-    const nowIso = getNowIsoBrasilia();
+    const nowIso = getNowIso(settings.timezonePreference);
     const updatedSwap: ShiftSwapRequest = {
       ...swap,
       status: accept ? 'pendente_admin' : 'recusada_colega',
@@ -282,8 +367,41 @@ export default function Home() {
 
     if (accept) {
       showToast('Troca aceita! Encaminhada para aprovação do Administrador.', 'success');
+
+      // Notifica o solicitante que o colega aceitou
+      dispatchNotification({
+        recipientId: swap.requesterId,
+        recipientRole: 'colaborador',
+        type: 'swap_accepted',
+        title: 'Solicitação de troca aceita',
+        message: `${formatNameAndSurname(swap.targetName)} aceitou sua proposta de troca de escala. Aguardando aprovação do administrador.`,
+        relatedSwapId: swap.id,
+        relatedWeekId: swap.weekId,
+      });
+
+      // Notifica o administrador para revisar e aprovar
+      dispatchNotification({
+        recipientId: 'admin',
+        recipientRole: 'admin',
+        type: 'swap_admin_review',
+        title: 'Troca de escala para aprovação',
+        message: `${formatNameAndSurname(swap.requesterName)} e ${formatNameAndSurname(swap.targetName)} concordaram com a troca para ${swap.requesterDayDate}. Clique para revisar e aprovar.`,
+        relatedSwapId: swap.id,
+        relatedWeekId: swap.weekId,
+      });
     } else {
       showToast('Solicitação de troca recusada.', 'info');
+
+      // Notifica o solicitante que o colega recusou
+      dispatchNotification({
+        recipientId: swap.requesterId,
+        recipientRole: 'colaborador',
+        type: 'swap_rejected',
+        title: 'Solicitação de troca recusada',
+        message: `${formatNameAndSurname(swap.targetName)} recusou sua proposta de troca de escala${reason ? `: "${reason}"` : '.'}`,
+        relatedSwapId: swap.id,
+        relatedWeekId: swap.weekId,
+      });
     }
   };
 
@@ -306,7 +424,7 @@ export default function Home() {
     const swap = shiftSwaps.find(s => s.id === swapId);
     if (!swap) return;
 
-    const nowIso = getNowIsoBrasilia();
+    const nowIso = getNowIso(settings.timezonePreference);
     const updatedSwap: ShiftSwapRequest = {
       ...swap,
       status: 'aprovada',
@@ -326,13 +444,35 @@ export default function Home() {
     saveShiftSwapToSupabase(updatedSwap).catch(() => {});
 
     showToast('Troca aprovada! A escala foi atualizada com sucesso.', 'success');
+
+    // Notifica o solicitante
+    dispatchNotification({
+      recipientId: swap.requesterId,
+      recipientRole: 'colaborador',
+      type: 'swap_approved',
+      title: 'Troca de escala aprovada',
+      message: `Sua troca de escala com ${formatNameAndSurname(swap.targetName)} para o dia ${swap.requesterDayDate} foi aprovada pelo administrador e já foi atualizada no sistema.`,
+      relatedSwapId: swap.id,
+      relatedWeekId: swap.weekId,
+    });
+
+    // Notifica o colega
+    dispatchNotification({
+      recipientId: swap.targetId,
+      recipientRole: 'colaborador',
+      type: 'swap_approved',
+      title: 'Troca de escala aprovada',
+      message: `A troca de escala com ${formatNameAndSurname(swap.requesterName)} para o dia ${swap.targetDayDate} foi aprovada pelo administrador e já foi atualizada no sistema.`,
+      relatedSwapId: swap.id,
+      relatedWeekId: swap.weekId,
+    });
   };
 
   const handleRejectShiftSwap = async (swapId: string, reason?: string) => {
     const swap = shiftSwaps.find(s => s.id === swapId);
     if (!swap) return;
 
-    const nowIso = getNowIsoBrasilia();
+    const nowIso = getNowIso(settings.timezonePreference);
     const updatedSwap: ShiftSwapRequest = {
       ...swap,
       status: 'recusada_admin',
@@ -346,6 +486,28 @@ export default function Home() {
     saveShiftSwapToSupabase(updatedSwap).catch(() => {});
 
     showToast('Solicitação de troca recusada pelo administrador.', 'info');
+
+    // Notifica o solicitante
+    dispatchNotification({
+      recipientId: swap.requesterId,
+      recipientRole: 'colaborador',
+      type: 'swap_admin_rejected',
+      title: 'Troca de escala recusada pelo administrador',
+      message: `A solicitação de troca de escala com ${formatNameAndSurname(swap.targetName)} foi recusada pelo administrador${reason ? `: "${reason}"` : '.'}`,
+      relatedSwapId: swap.id,
+      relatedWeekId: swap.weekId,
+    });
+
+    // Notifica o colega
+    dispatchNotification({
+      recipientId: swap.targetId,
+      recipientRole: 'colaborador',
+      type: 'swap_admin_rejected',
+      title: 'Troca de escala recusada pelo administrador',
+      message: `A solicitação de troca de escala com ${formatNameAndSurname(swap.requesterName)} foi recusada pelo administrador${reason ? `: "${reason}"` : '.'}`,
+      relatedSwapId: swap.id,
+      relatedWeekId: swap.weekId,
+    });
   };
 
   // Manipuladores de Escala
@@ -405,7 +567,7 @@ export default function Home() {
       isPublished: true,
       isPublicShareEnabled: true,
       shareToken: generatedToken,
-      publishedAt: getNowIsoBrasilia(),
+      publishedAt: getNowIso(settings.timezonePreference),
     };
     persistSchedule(updatedSchedule);
     showToast('Escala publicada com sucesso! Link exclusivo gerado.', 'success');
@@ -640,10 +802,6 @@ export default function Home() {
     setWeekOffset(0);
     showToast('Dados de demonstração restaurados com sucesso.', 'info');
   };
-
-  const loggedEmp = employees.find(
-    e => e.id === currentUser?.id || e.email?.toLowerCase() === currentUser?.email?.toLowerCase()
-  );
 
   const handleUpdateProfile = async (data: {
     name: string;

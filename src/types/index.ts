@@ -2,6 +2,10 @@ export type ShiftStatus = 'T' | 'F' | 'AUSENTE' | 'FERIAS' | 'AFASTADO' | 'SEM_E
 
 export type UserProfile = 'funcionario' | 'administrador';
 
+export type WorkModel = 'presencial' | 'home_office' | 'hibrido';
+
+export type TimezonePreference = 'brasilia' | 'local';
+
 export interface Employee {
   id: string;
   name: string;
@@ -10,6 +14,7 @@ export interface Employee {
   status: 'active' | 'inactive';
   team?: string; // Time ao qual pertence (ex: 'Operações de Loja', 'Vendas e Atendimento', etc.)
   workHours?: string; // Horário de expediente (ex: '08:00 às 17:00')
+  workModel?: WorkModel; // Modalidade padrão (presencial, home office ou híbrido)
   avatarUrl?: string;
   initials: string;
   colorBg: string;
@@ -50,6 +55,7 @@ export interface WeekSchedule {
   shareToken?: string;
   shifts: Record<string, ShiftStatus[]>; // employeeId -> [7 items for Mon..Sun]
   customHours?: Record<string, (string | undefined)[]>; // employeeId -> [7 items for Mon..Sun] horario personalizado (ex: '08:00 às 17:00')
+  workModels?: Record<string, (WorkModel | undefined)[]>; // employeeId -> [7 items for Mon..Sun] modalidade por dia
 }
 
 export interface CompanySettings {
@@ -61,6 +67,7 @@ export interface CompanySettings {
   rotateSundays: boolean;
   operatesOnHolidays?: boolean; // Se a unidade/loja opera em feriados nacionais
   startDay: number;
+  timezonePreference?: TimezonePreference; // 'brasilia' ou 'local'
 }
 
 export type ActiveTab = 'inicio' | 'escala' | 'ajustes' | 'perfil';
@@ -97,4 +104,26 @@ export interface ShiftSwapRequest {
   colleagueRespondedAt?: string;
   adminDecidedAt?: string;
   adminId?: string;
+}
+
+export type NotificationType =
+  | 'swap_requested'
+  | 'swap_accepted'
+  | 'swap_rejected'
+  | 'swap_admin_review'
+  | 'swap_approved'
+  | 'swap_admin_rejected'
+  | 'schedule_published';
+
+export interface AppNotification {
+  id: string;
+  recipientId: string; // ID do colaborador específico ou 'admin'
+  recipientRole?: 'admin' | 'colaborador' | 'all';
+  type: NotificationType;
+  title: string;
+  message: string;
+  relatedSwapId?: string;
+  relatedWeekId?: string;
+  read: boolean;
+  createdAt: string;
 }

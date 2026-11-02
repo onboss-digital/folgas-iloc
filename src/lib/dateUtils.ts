@@ -1,7 +1,9 @@
 /**
- * Utilitários de Data e Hora com Fuso Horário de Brasília (America/Sao_Paulo / BRT / GMT-3)
- * Garante consistência absoluta entre servidor, computadores e celulares de qualquer fuso.
+ * Utilitários de Data e Hora com Suporte a Fuso Horário de Brasília (BRT) e Horário Local
+ * Permite que o administrador defina a referência da empresa mantendo consistência entre os dispositivos.
  */
+
+import { TimezonePreference } from '../types';
 
 export const TIMEZONE_BRASILIA = 'America/Sao_Paulo';
 
@@ -15,6 +17,20 @@ export interface BrasiliaDateParts {
   dateStr: string; // YYYY-MM-DD
   timeStr: string; // HH:mm
   fullFormatted: string; // DD/MM/YYYY às HH:mm
+}
+
+/**
+ * Retorna o rótulo descritivo do fuso horário configurado
+ */
+export function getTimezoneLabel(preference: TimezonePreference = 'brasilia'): string {
+  return preference === 'local' ? 'Horário Local da Equipe' : 'Horário de Brasília (BRT)';
+}
+
+/**
+ * Retorna o selo/badge curto do fuso horário configurado
+ */
+export function getTimezoneBadge(preference: TimezonePreference = 'brasilia'): string {
+  return preference === 'local' ? 'LOCAL' : 'BRT';
 }
 
 /**
@@ -61,10 +77,34 @@ export function getBrasiliaDateParts(date: Date = new Date()): BrasiliaDateParts
 }
 
 /**
- * Retorna a data de hoje no fuso horário de Brasília (YYYY-MM-DD)
+ * Retorna a data atual (YYYY-MM-DD) respeitando a preferência de fuso horário
+ */
+export function getTodayStr(preference: TimezonePreference = 'brasilia'): string {
+  if (preference === 'local') {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return getBrasiliaDateParts().dateStr;
+}
+
+/**
+ * Retorna a data de hoje no fuso horário de Brasília (YYYY-MM-DD) - alias retrocompatível
  */
 export function getTodayStrBrasilia(): string {
   return getBrasiliaDateParts().dateStr;
+}
+
+/**
+ * Retorna ISO timestamp respeitando a preferência de fuso horário
+ */
+export function getNowIso(preference: TimezonePreference = 'brasilia'): string {
+  if (preference === 'local') {
+    return new Date().toISOString();
+  }
+  return getNowIsoBrasilia();
 }
 
 /**
@@ -77,25 +117,62 @@ export function getNowIsoBrasilia(): string {
 }
 
 /**
- * Formata data e hora legível no Horário de Brasília (BRT)
+ * Formata data e hora legível no fuso configurado
  */
-export function formatDateTimeBrasilia(dateOrIso: string | Date | undefined): string {
+export function formatDateTime(
+  dateOrIso: string | Date | undefined,
+  preference: TimezonePreference = 'brasilia'
+): string {
   if (!dateOrIso) return '';
   const d = typeof dateOrIso === 'string' ? new Date(dateOrIso) : dateOrIso;
   if (isNaN(d.getTime())) return String(dateOrIso);
+
+  if (preference === 'local') {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${dd}/${mm}/${yyyy} às ${hh}:${min} (Local)`;
+  }
+
   const p = getBrasiliaDateParts(d);
   return `${p.fullFormatted} (BRT)`;
 }
 
 /**
- * Formata apenas a hora no Horário de Brasília (BRT)
+ * Formata data e hora legível no Horário de Brasília (BRT) - alias retrocompatível
  */
-export function formatTimeBrasilia(dateOrIso: string | Date | undefined): string {
+export function formatDateTimeBrasilia(dateOrIso: string | Date | undefined): string {
+  return formatDateTime(dateOrIso, 'brasilia');
+}
+
+/**
+ * Formata apenas a hora respeitando o fuso configurado
+ */
+export function formatTime(
+  dateOrIso: string | Date | undefined,
+  preference: TimezonePreference = 'brasilia'
+): string {
   if (!dateOrIso) return '';
   const d = typeof dateOrIso === 'string' ? new Date(dateOrIso) : dateOrIso;
   if (isNaN(d.getTime())) return '';
+
+  if (preference === 'local') {
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${hh}:${min} (Local)`;
+  }
+
   const p = getBrasiliaDateParts(d);
   return `${p.timeStr} (BRT)`;
+}
+
+/**
+ * Formata apenas a hora no Horário de Brasília (BRT) - alias retrocompatível
+ */
+export function formatTimeBrasilia(dateOrIso: string | Date | undefined): string {
+  return formatTime(dateOrIso, 'brasilia');
 }
 
 /**

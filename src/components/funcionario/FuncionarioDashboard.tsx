@@ -24,6 +24,7 @@ interface FuncionarioDashboardProps {
   todayStr?: string;
   currentUser?: AuthUser | null;
   shiftSwaps?: ShiftSwapRequest[];
+  timezonePreference?: 'brasilia' | 'local';
   onOpenSolicitarTroca?: () => void;
   onOpenMinhasTrocas?: () => void;
 }
@@ -36,6 +37,7 @@ export function FuncionarioDashboard({
   todayStr,
   currentUser,
   shiftSwaps = [],
+  timezonePreference = 'brasilia',
   onOpenSolicitarTroca,
   onOpenMinhasTrocas,
 }: FuncionarioDashboardProps) {
@@ -164,14 +166,16 @@ export function FuncionarioDashboard({
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-800">
-                Horários de Brasília (BRT)
+                {timezonePreference === 'local' ? 'Horário Local' : 'Horários de Brasília (BRT)'}
               </span>
               <span className="px-2 py-0.2 rounded-md bg-slate-100 text-slate-600 text-[10px] font-mono font-bold">
-                GMT-3
+                {timezonePreference === 'local' ? 'Local' : 'GMT-3'}
               </span>
             </div>
             <span className="text-[11px] text-slate-500">
-              Escala oficial padronizada pelo fuso horário de Brasília
+              {timezonePreference === 'local'
+                ? 'Escala oficial padronizada pelo fuso horário local da empresa'
+                : 'Escala oficial padronizada pelo fuso horário de Brasília'}
             </span>
           </div>
         </div>
@@ -289,9 +293,25 @@ export function FuncionarioDashboard({
                 <span className="text-base font-extrabold text-slate-900 leading-tight truncate">
                   {formatNameAndSurname(loggedEmployee.name)}
                 </span>
-                <span className="text-xs text-slate-500 truncate">
-                  {loggedEmployee.role} • {loggedEmployee.team || 'Operações de Loja'}
-                </span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs text-slate-500 truncate">
+                    {loggedEmployee.role} • {loggedEmployee.team || 'Operações de Loja'}
+                  </span>
+                  {!isMyDayOff && (() => {
+                    const myWorkModel = schedule.workModels?.[loggedEmployee.id]?.[viewingDayIdx] || loggedEmployee.workModel || 'presencial';
+                    return (
+                      <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md ${
+                        myWorkModel === 'home_office'
+                          ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                          : myWorkModel === 'hibrido'
+                          ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                          : 'bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}>
+                        {myWorkModel === 'home_office' ? 'Home office' : myWorkModel === 'hibrido' ? 'Híbrido' : 'Presencial'}
+                      </span>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
 
@@ -405,9 +425,25 @@ export function FuncionarioDashboard({
                     <span className="text-sm font-bold text-slate-900 truncate">
                       {formatNameAndSurname(emp.name)}
                     </span>
-                    <span className="text-xs text-slate-500 truncate">
-                      {emp.role}
-                    </span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-xs text-slate-500 truncate">
+                        {emp.role}
+                      </span>
+                      {(() => {
+                        const empWorkModel = schedule.workModels?.[emp.id]?.[viewingDayIdx] || emp.workModel || 'presencial';
+                        return (
+                          <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md ${
+                            empWorkModel === 'home_office'
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : empWorkModel === 'hibrido'
+                              ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                              : 'bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}>
+                            {empWorkModel === 'home_office' ? 'Home office' : empWorkModel === 'hibrido' ? 'Híbrido' : 'Presencial'}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
 

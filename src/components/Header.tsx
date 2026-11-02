@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   LogOut,
+  Bell,
   User,
   ChevronDown,
   Edit3,
@@ -21,6 +22,9 @@ interface HeaderProps {
   employeeAvatarUrl?: string;
   activeTab?: ActiveTab;
   onChangeTab?: (tab: ActiveTab) => void;
+  unreadNotificationsCount?: number;
+  onOpenNotifications?: () => void;
+  timezoneBadge?: string;
 }
 
 export function Header({
@@ -31,6 +35,9 @@ export function Header({
   employeeAvatarUrl,
   activeTab,
   onChangeTab,
+  unreadNotificationsCount = 0,
+  onOpenNotifications,
+  timezoneBadge,
 }: HeaderProps) {
   const isAdmin = currentUser?.role === 'admin';
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -144,12 +151,31 @@ export function Header({
           </nav>
         )}
 
-        {/* Menu do Perfil: Apenas no clique */}
+        {/* Ações da Direita: Notificações e Perfil */}
         {currentUser && (
-          <div
-            ref={menuRef}
-            className="relative flex items-center flex-shrink-0"
-          >
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Botão de Notificações com sino e badge */}
+            {onOpenNotifications && (
+              <button
+                type="button"
+                onClick={onOpenNotifications}
+                className="relative w-9 h-9 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 active:scale-95 flex items-center justify-center text-slate-600 transition-all shadow-2xs group"
+                title="Notificações do sistema"
+              >
+                <Bell className="w-4 h-4 text-slate-600 group-hover:text-blue-600 transition-colors" />
+                {unreadNotificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center shadow-xs ring-2 ring-white">
+                    {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {/* Menu do Perfil: Apenas no clique */}
+            <div
+              ref={menuRef}
+              className="relative flex items-center flex-shrink-0"
+            >
             <button
               type="button"
               onClick={() => setIsMenuOpen(prev => !prev)}
@@ -253,6 +279,7 @@ export function Header({
                 )}
               </div>
             )}
+            </div>
           </div>
         )}
       </div>

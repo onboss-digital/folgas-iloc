@@ -194,3 +194,51 @@ create policy "shift_swaps_update_policy"
   on public.shift_swaps for update
   to anon, authenticated
   using (true);
+
+
+-- ==============================================================================
+-- 11. COLUNAS ADICIONAIS: FUSO HORÁRIO E MODALIDADE DE TRABALHO
+-- ==============================================================================
+alter table if exists public.company_settings add column if not exists timezone_preference text default 'brasilia';
+alter table if exists public.employees add column if not exists work_model text default 'presencial';
+alter table if exists public.schedules add column if not exists work_models jsonb default '{}'::jsonb;
+
+-- ==============================================================================
+-- 12. TABELA DE NOTIFICAÇÕES INTERNAS DO SISTEMA
+-- ==============================================================================
+create table if not exists public.notifications (
+  id text primary key,
+  recipient_id text not null,
+  recipient_role text default 'colaborador',
+  type text not null,
+  title text not null,
+  message text not null,
+  related_swap_id text,
+  related_week_id text,
+  read boolean default false not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists idx_notifications_recipient on public.notifications(recipient_id);
+create index if not exists idx_notifications_read on public.notifications(read);
+create index if not exists idx_notifications_created_at on public.notifications(created_at desc);
+
+alter table public.notifications enable row level security;
+
+drop policy if exists "notifications_select_policy" on public.notifications;
+create policy "notifications_select_policy"
+  on public.notifications for select
+  to anon, authenticated
+  using (true);
+
+drop policy if exists "notifications_insert_policy" on public.notifications;
+create policy "notifications_insert_policy"
+  on public.notifications for insert
+  to anon, authenticated
+  with check (true);
+
+drop policy if exists "notifications_update_policy" on public.notifications;
+create policy "notifications_update_policy"
+  on public.notifications for update
+  to anon, authenticated
+  using (true);
