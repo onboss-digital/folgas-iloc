@@ -153,7 +153,7 @@ export function MinhasTrocasModal({
                 </span>
               </div>
               <span className="text-[11px] text-slate-500 font-medium">
-                Acompanhamento e respostas de trocas de turnos em Horário de Brasília
+                Acompanhamento e respostas de trocas de turnos em Horário Local
               </span>
             </div>
           </div>

@@ -259,7 +259,7 @@ function EscalaPublicaContent() {
               {weekHeader.monthTitle}
             </span>
             <span className="bg-blue-700/60 px-2 py-0.5 rounded-full text-[11px] font-medium">
-              Horário de Brasília (GMT-3)
+              Horário Local
             </span>
           </div>
 
@@ -382,7 +382,7 @@ function EscalaPublicaContent() {
                         <span>{dayHours.replace('às', '–')}</span>
                       </span>
                       <span className="text-[10px] text-slate-400 mt-0.5">
-                        1h intervalo • Horário de Brasília
+                        1h de intervalo • Horário Local
                       </span>
                     </div>
                   </div>

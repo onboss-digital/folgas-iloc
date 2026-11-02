@@ -115,6 +115,7 @@ export const INITIAL_SETTINGS: CompanySettings = {
   rotateSundays: true,
   operatesOnHolidays: true,
   startDay: 1, // Segunda-feira
+  timezonePreference: 'local',
 };
 
 export const INITIAL_WEEK_SCHEDULE: WeekSchedule = {
@@ -225,7 +226,7 @@ export function getISOWeekNumber(d: Date): { weekNumber: number; weekYear: numbe
 export function getWeekDateRange(
   weekOffset: number,
   referenceDateStr?: string,
-  preference: TimezonePreference = 'brasilia'
+  preference: TimezonePreference = 'local'
 ) {
   const refDateStr = referenceDateStr || getTodayStr(preference);
   const [y, m, d] = refDateStr.split('-').map(Number);

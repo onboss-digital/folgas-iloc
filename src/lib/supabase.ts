@@ -534,7 +534,7 @@ export async function fetchSettingsFromSupabase(): Promise<CompanySettings | nul
       rotateSundays: data.rotate_sundays,
       operatesOnHolidays: data.operates_on_holidays,
       startDay: data.start_day,
-      timezonePreference: data.timezone_preference || 'brasilia',
+      timezonePreference: data.timezone_preference || 'local',
     };
   } catch (err) {
     console.warn('Exceção ao carregar configurações do Supabase:', err);
@@ -559,7 +559,7 @@ export async function saveSettingsToSupabase(settings: CompanySettings): Promise
       rotate_sundays: settings.rotateSundays,
       operates_on_holidays: settings.operatesOnHolidays ?? true,
       start_day: settings.startDay,
-      timezone_preference: settings.timezonePreference || 'brasilia',
+      timezone_preference: settings.timezonePreference || 'local',
       updated_at: new Date().toISOString(),
     });
 

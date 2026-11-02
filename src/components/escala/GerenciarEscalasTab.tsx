@@ -183,6 +183,14 @@ export function GerenciarEscalasTab({
   const [weekEditorShifts, setWeekEditorShifts] = useState<ShiftStatus[]>([]);
   const [weekEditorCustomHours, setWeekEditorCustomHours] = useState<(string | undefined)[]>([]);
 
+  // Modo de edição da escala caso já esteja publicada
+  const [isEditingPublished, setIsEditingPublished] = useState<boolean>(false);
+
+  // Redefine o modo de edição ao trocar de semana
+  React.useEffect(() => {
+    setIsEditingPublished(false);
+  }, [weekOffset]);
+
   // Modal de conferência pré-publicação
   const [isPublishModalOpen, setIsPublishModalOpen] = useState<boolean>(false);
 
@@ -390,6 +398,9 @@ export function GerenciarEscalasTab({
       },
     };
 
+    if (schedule.isPublished) {
+      setIsEditingPublished(true);
+    }
     onSaveDraft(updatedSchedule);
     setQuickEditor(null);
   };
@@ -436,6 +447,9 @@ export function GerenciarEscalasTab({
       },
     };
 
+    if (schedule.isPublished) {
+      setIsEditingPublished(true);
+    }
     onSaveDraft(updatedSchedule);
   };
 
@@ -541,6 +555,9 @@ export function GerenciarEscalasTab({
       },
     };
 
+    if (schedule.isPublished) {
+      setIsEditingPublished(true);
+    }
     onSaveDraft(updatedSchedule);
     setEditingEmployeeWeek(null);
   };
@@ -782,10 +799,17 @@ export function GerenciarEscalasTab({
                   Quadro de Escalas
                 </h1>
                 {schedule.isPublished ? (
-                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold inline-flex items-center gap-1 shadow-2xs">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                    Publicada
-                  </span>
+                  isEditingPublished ? (
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 text-[11px] font-bold inline-flex items-center gap-1 shadow-2xs">
+                      <Edit2 className="w-3 h-3 text-amber-700" />
+                      Em Edição (Publicada)
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold inline-flex items-center gap-1 shadow-2xs">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      Publicada
+                    </span>
+                  )
                 ) : (
                   <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold inline-flex items-center gap-1 shadow-2xs">
                     <Clock className="w-3 h-3 text-amber-600" />
@@ -895,14 +919,62 @@ export function GerenciarEscalasTab({
               <span>Salvar Rascunho</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setIsPublishModalOpen(true)}
-              className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
-            >
-              <Send className="w-3.5 h-3.5 text-white" />
-              <span>Publicar Escala</span>
-            </button>
+            {schedule.isPublished ? (
+              !isEditingPublished ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingPublished(true)}
+                    className="h-10 px-3.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 active:scale-95 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                    title="Habilitar modo de edição para alterar esta escala já publicada"
+                  >
+                    <Edit2 className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Editar Escala</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled
+                    className="h-10 px-4 rounded-xl bg-blue-600/35 text-white/90 border border-blue-600/20 cursor-not-allowed text-xs font-bold flex items-center gap-1.5 shadow-none select-none"
+                    title="Esta escala já está publicada. Para alterar dias ou horários, clique no botão Editar Escala ao lado."
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-white/80" />
+                    <span>Escala Publicada</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingPublished(false)}
+                    className="h-10 px-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 active:scale-95 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                    title="Cancelar modo de edição da escala"
+                  >
+                    <X className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Cancelar Edição</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsPublishModalOpen(true)}
+                    className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs ring-2 ring-blue-500/20"
+                    title="Atualizar e sincronizar alterações com todos os colaboradores"
+                  >
+                    <Send className="w-3.5 h-3.5 text-white" />
+                    <span>Atualizar Escala</span>
+                  </button>
+                </>
+              )
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsPublishModalOpen(true)}
+                className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+              >
+                <Send className="w-3.5 h-3.5 text-white" />
+                <span>Publicar Escala</span>
+              </button>
+            )}
 
             {onDeleteSchedule && (
               <button
@@ -918,6 +990,40 @@ export function GerenciarEscalasTab({
           </div>
         </div>
       </section>
+
+      {/* Alerta de Modo de Edição para Escala Publicada */}
+      {schedule.isPublished && isEditingPublished && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-900 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center flex-shrink-0">
+              <Edit2 className="w-4 h-4 text-amber-700" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-bold text-amber-950">Modo de edição ativo para escala publicada</span>
+              <span className="text-[11px] text-amber-800">
+                Altere os turnos e folgas diretamente na tabela. Quando finalizar, clique em &quot;Atualizar Escala&quot; para republicar as modificações para a equipe.
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-center">
+            <button
+              type="button"
+              onClick={() => setIsEditingPublished(false)}
+              className="px-3 py-1.5 rounded-xl bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 font-bold text-xs transition-all"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsPublishModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-all shadow-xs flex items-center gap-1.5"
+            >
+              <Send className="w-3 h-3 text-white" />
+              <span>Atualizar Escala</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ==============================================================
           2. QUADRO VISUAL DE PLANEJAMENTO DA EQUIPE (A GRADE)
@@ -1826,7 +1932,7 @@ export function GerenciarEscalasTab({
               </div>
               <div className="flex flex-col">
                 <h3 className="text-base font-black text-slate-900">
-                  Conferência e Publicação da Escala
+                  {schedule.isPublished ? 'Atualizar e Republicar Escala' : 'Conferência e Publicação da Escala'}
                 </h3>
                 <span className="text-xs text-slate-500">
                   {weekHeader.monthTitle} • {weekHeader.weekSubtitle}
@@ -1835,7 +1941,9 @@ export function GerenciarEscalasTab({
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Confira abaixo o resumo da programação antes de publicar. Ao confirmar, todos os colaboradores terão acesso imediato aos seus turnos e folgas.
+              {schedule.isPublished
+                ? 'Confira abaixo o resumo da programação ajustada antes de atualizar. Ao confirmar, todos os colaboradores terão acesso imediato às alterações.'
+                : 'Confira abaixo o resumo da programação antes de publicar. Ao confirmar, todos os colaboradores terão acesso imediato aos seus turnos e folgas.'}
             </p>
 
             {/* Tabela de Resumo por Colaborador */}
@@ -1903,11 +2011,12 @@ export function GerenciarEscalasTab({
                 type="button"
                 onClick={() => {
                   setIsPublishModalOpen(false);
+                  setIsEditingPublished(false);
                   onPublishSchedule(schedule);
                 }}
                 className="flex-1 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs"
               >
-                Confirmar e Publicar Agora
+                {schedule.isPublished ? 'Confirmar e Atualizar Escala' : 'Confirmar e Publicar Agora'}
               </button>
             </div>
           </div>

@@ -232,7 +232,7 @@ export function EscalaTab({
                 Escala do Time • {selectedTeam || 'Operações de Loja'}
               </span>
               <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold">
-                {settings.timezonePreference === 'local' ? 'Horário Local' : 'Horários de Brasília (BRT)'}
+                'Horário Local'
               </span>
             </div>
             <h1 className="text-base font-black text-slate-900 tracking-tight">

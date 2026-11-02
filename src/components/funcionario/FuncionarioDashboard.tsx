@@ -175,16 +175,14 @@ export function FuncionarioDashboard({
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-800">
-                {timezonePreference === 'local' ? 'Horário Local' : 'Horários de Brasília (BRT)'}
+                Horário Local da Empresa
               </span>
               <span className="px-2 py-0.2 rounded-md bg-slate-100 text-slate-600 text-[10px] font-mono font-bold">
-                {timezonePreference === 'local' ? 'Local' : 'GMT-3'}
+                LOCAL
               </span>
             </div>
             <span className="text-[11px] text-slate-500">
-              {timezonePreference === 'local'
-                ? 'Escala oficial padronizada pelo fuso horário local da empresa'
-                : 'Escala oficial padronizada pelo fuso horário de Brasília'}
+              Escala oficial padronizada pelo horário local da sua equipe
             </span>
           </div>
         </div>
@@ -543,7 +541,7 @@ export function FuncionarioDashboard({
                     <span>{getEmployeeDayHours(schedule, emp, viewingDayIdx)}</span>
                   </span>
                   <span className="text-[10px] text-slate-400 mt-0.5">
-                    {currentDayInfo.isHoliday ? 'Feriado • Horário de Brasília' : 'Horário de Brasília (GMT-3)'}
+                    {currentDayInfo.isHoliday ? 'Feriado • Horário Local' : 'Horário Local'}
                   </span>
                 </div>
               </div>

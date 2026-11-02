@@ -131,7 +131,7 @@ export function AdminTrocasModal({
                 </span>
               </div>
               <span className="text-[11px] text-slate-500 font-medium">
-                Validação e homologação de trocas de turnos em Horário de Brasília
+                Validação e homologação de trocas de turnos em Horário Local
               </span>
             </div>
           </div>
