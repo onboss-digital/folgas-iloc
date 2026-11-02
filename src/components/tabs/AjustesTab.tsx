@@ -571,62 +571,7 @@ export function AjustesTab({
               </button>
             </div>
 
-            {/* Referência de Fuso Horário Oficial */}
-            <div className="flex flex-col gap-2 pt-1">
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Globe className="w-3.5 h-3.5 text-blue-600" />
-                    Referência de Fuso Horário
-                  </span>
-                  <span className="text-[11px] text-slate-500">
-                    Define qual referência de horário será aplicada em todas as escalas e visualizações
-                  </span>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => onUpdateSettings({ ...settings, timezonePreference: 'brasilia' })}
-                  className={`p-3 rounded-xl border text-left flex flex-col gap-0.5 transition-all ${
-                    (settings.timezonePreference || 'brasilia') === 'brasilia'
-                      ? 'border-blue-500 bg-blue-50/60 ring-1 ring-blue-500 text-blue-900 shadow-2xs font-bold'
-                      : 'border-slate-200 bg-slate-50/60 hover:bg-slate-100/60 text-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold">Horário de Brasília</span>
-                    <span className="px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 text-[10px] font-mono font-bold">
-                      BRT
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-500 font-normal">
-                    Fuso oficial America/Sao_Paulo (GMT-3)
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => onUpdateSettings({ ...settings, timezonePreference: 'local' })}
-                  className={`p-3 rounded-xl border text-left flex flex-col gap-0.5 transition-all ${
-                    settings.timezonePreference === 'local'
-                      ? 'border-blue-500 bg-blue-50/60 ring-1 ring-blue-500 text-blue-900 shadow-2xs font-bold'
-                      : 'border-slate-200 bg-slate-50/60 hover:bg-slate-100/60 text-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold">Horário Local</span>
-                    <span className="px-1.5 py-0.2 rounded bg-slate-200 text-slate-700 text-[10px] font-mono font-bold">
-                      LOCAL
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-500 font-normal">
-                    Fuso local da equipe ou filial
-                  </span>
-                </button>
-              </div>
-            </div>
           </div>
         </section>
       </div>

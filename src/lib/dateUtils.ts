@@ -1,6 +1,5 @@
 /**
- * Utilitários de Data e Hora com Suporte a Fuso Horário de Brasília (BRT) e Horário Local
- * Permite que o administrador defina a referência da empresa mantendo consistência entre os dispositivos.
+ * Utilitários de Data e Hora com Suporte a Horário Local Oficial
  */
 
 import { TimezonePreference } from '../types';
@@ -22,41 +21,27 @@ export interface BrasiliaDateParts {
 /**
  * Retorna o rótulo descritivo do fuso horário configurado
  */
-export function getTimezoneLabel(preference: TimezonePreference = 'brasilia'): string {
-  return preference === 'local' ? 'Horário Local da Equipe' : 'Horário de Brasília (BRT)';
+export function getTimezoneLabel(preference: TimezonePreference = 'local'): string {
+  return 'Horário Local';
 }
 
 /**
  * Retorna o selo/badge curto do fuso horário configurado
  */
-export function getTimezoneBadge(preference: TimezonePreference = 'brasilia'): string {
-  return preference === 'local' ? 'LOCAL' : 'BRT';
+export function getTimezoneBadge(preference: TimezonePreference = 'local'): string {
+  return 'LOCAL';
 }
 
 /**
- * Decompõe uma data no fuso de Brasília
+ * Decompõe uma data no fuso local
  */
 export function getBrasiliaDateParts(date: Date = new Date()): BrasiliaDateParts {
-  const formatter = new Intl.DateTimeFormat('pt-BR', {
-    timeZone: TIMEZONE_BRASILIA,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
-
-  const parts = formatter.formatToParts(date);
-  const get = (type: string) => parts.find(p => p.type === type)?.value || '00';
-
-  const year = parseInt(get('year'), 10);
-  const month = parseInt(get('month'), 10);
-  const day = parseInt(get('day'), 10);
-  const hour = parseInt(get('hour'), 10);
-  const minute = parseInt(get('minute'), 10);
-  const second = parseInt(get('second'), 10);
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const hour = date.getHours();
+  const minute = date.getMinutes();
+  const second = date.getSeconds();
 
   const mm = String(month).padStart(2, '0');
   const dd = String(day).padStart(2, '0');
@@ -77,102 +62,84 @@ export function getBrasiliaDateParts(date: Date = new Date()): BrasiliaDateParts
 }
 
 /**
- * Retorna a data atual (YYYY-MM-DD) respeitando a preferência de fuso horário
+ * Retorna a data atual (YYYY-MM-DD) em Horário Local
  */
-export function getTodayStr(preference: TimezonePreference = 'brasilia'): string {
-  if (preference === 'local') {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-  return getBrasiliaDateParts().dateStr;
+export function getTodayStr(preference: TimezonePreference = 'local'): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 /**
- * Retorna a data de hoje no fuso horário de Brasília (YYYY-MM-DD) - alias retrocompatível
+ * Retorna a data de hoje (YYYY-MM-DD)
  */
 export function getTodayStrBrasilia(): string {
-  return getBrasiliaDateParts().dateStr;
+  return getTodayStr('local');
 }
 
 /**
  * Retorna ISO timestamp respeitando a preferência de fuso horário
  */
-export function getNowIso(preference: TimezonePreference = 'brasilia'): string {
-  if (preference === 'local') {
-    return new Date().toISOString();
-  }
-  return getNowIsoBrasilia();
+export function getNowIso(preference: TimezonePreference = 'local'): string {
+  return new Date().toISOString();
 }
 
 /**
- * Retorna ISO timestamp com o offset de Brasília (-03:00)
+ * Retorna ISO timestamp
  */
 export function getNowIsoBrasilia(): string {
-  const p = getBrasiliaDateParts();
-  const ss = String(p.second).padStart(2, '0');
-  return `${p.dateStr}T${p.timeStr}:${ss}-03:00`;
+  return new Date().toISOString();
 }
 
 /**
- * Formata data e hora legível no fuso configurado
+ * Formata data e hora legível em Horário Local
  */
 export function formatDateTime(
   dateOrIso: string | Date | undefined,
-  preference: TimezonePreference = 'brasilia'
+  preference: TimezonePreference = 'local'
 ): string {
   if (!dateOrIso) return '';
   const d = typeof dateOrIso === 'string' ? new Date(dateOrIso) : dateOrIso;
   if (isNaN(d.getTime())) return String(dateOrIso);
 
-  if (preference === 'local') {
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const yyyy = d.getFullYear();
-    const hh = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
-    return `${dd}/${mm}/${yyyy} às ${hh}:${min} (Local)`;
-  }
-
-  const p = getBrasiliaDateParts(d);
-  return `${p.fullFormatted} (BRT)`;
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${dd}/${mm}/${yyyy} às ${hh}:${min}`;
 }
 
 /**
- * Formata data e hora legível no Horário de Brasília (BRT) - alias retrocompatível
+ * Formata data e hora legível
  */
 export function formatDateTimeBrasilia(dateOrIso: string | Date | undefined): string {
-  return formatDateTime(dateOrIso, 'brasilia');
+  return formatDateTime(dateOrIso, 'local');
 }
 
 /**
- * Formata apenas a hora respeitando o fuso configurado
+ * Formata apenas a hora em Horário Local
  */
 export function formatTime(
   dateOrIso: string | Date | undefined,
-  preference: TimezonePreference = 'brasilia'
+  preference: TimezonePreference = 'local'
 ): string {
   if (!dateOrIso) return '';
   const d = typeof dateOrIso === 'string' ? new Date(dateOrIso) : dateOrIso;
   if (isNaN(d.getTime())) return '';
 
-  if (preference === 'local') {
-    const hh = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
-    return `${hh}:${min} (Local)`;
-  }
-
-  const p = getBrasiliaDateParts(d);
-  return `${p.timeStr} (BRT)`;
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${min}`;
 }
 
 /**
- * Formata apenas a hora no Horário de Brasília (BRT) - alias retrocompatível
+ * Formata apenas a hora
  */
 export function formatTimeBrasilia(dateOrIso: string | Date | undefined): string {
-  return formatTime(dateOrIso, 'brasilia');
+  return formatTime(dateOrIso, 'local');
 }
 
 /**

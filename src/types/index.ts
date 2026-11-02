@@ -4,7 +4,7 @@ export type UserProfile = 'funcionario' | 'administrador';
 
 export type WorkModel = 'presencial' | 'home_office' | 'hibrido';
 
-export type TimezonePreference = 'brasilia' | 'local';
+export type TimezonePreference = 'local' | 'brasilia';
 
 export interface Employee {
   id: string;
@@ -67,7 +67,7 @@ export interface CompanySettings {
   rotateSundays: boolean;
   operatesOnHolidays?: boolean; // Se a unidade/loja opera em feriados nacionais
   startDay: number;
-  timezonePreference?: TimezonePreference; // 'brasilia' ou 'local'
+  timezonePreference?: TimezonePreference; // Horário Local Oficial
 }
 
 export type ActiveTab = 'inicio' | 'escala' | 'ajustes' | 'perfil';

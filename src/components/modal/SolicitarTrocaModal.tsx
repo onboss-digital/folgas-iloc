@@ -178,7 +178,7 @@ export function SolicitarTrocaModal({
                 </span>
               </div>
               <span className="text-[11px] text-slate-500 font-medium">
-                Equipe: {userTeam} • Horários de Brasília
+                Equipe: {userTeam} • Horário Local
               </span>
             </div>
           </div>
@@ -402,7 +402,7 @@ export function SolicitarTrocaModal({
                 </div>
               </div>
               <span className="text-[10px] text-slate-500 font-medium">
-                Horários de acordo com o Horário de Brasília (BRT).
+                Horários calculados de acordo com o Horário Local da sua equipe.
               </span>
             </div>
           )}

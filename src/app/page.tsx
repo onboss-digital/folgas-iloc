@@ -560,6 +560,7 @@ export default function Home() {
       showToast(`Atenção: Os dias ${names} estão abaixo do mínimo de ${settings.minStaffPerDay} pessoas.`, 'warning');
     }
 
+    const isAlreadyPublished = Boolean(newSchedule.isPublished && newSchedule.publishedAt);
     const generatedToken = newSchedule.shareToken || `escala-semana-${newSchedule.weekNumber}-${Date.now().toString(36)}`;
 
     const updatedSchedule: WeekSchedule = {
@@ -570,8 +571,13 @@ export default function Home() {
       publishedAt: getNowIso(settings.timezonePreference),
     };
     persistSchedule(updatedSchedule);
-    showToast('Escala publicada com sucesso! Link exclusivo gerado.', 'success');
-    setIsShareModalOpen(true);
+
+    if (isAlreadyPublished) {
+      showToast('Escala atualizada e sincronizada com sucesso!', 'success');
+    } else {
+      showToast('Escala publicada com sucesso! Link exclusivo gerado.', 'success');
+      setIsShareModalOpen(true);
+    }
   };
 
   const handleCreateScheduleForWeek = () => {
