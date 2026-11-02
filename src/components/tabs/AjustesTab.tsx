@@ -62,7 +62,6 @@ export function AjustesTab({
   const [team, setTeam] = useState('Operações de Loja');
   const [customTeam, setCustomTeam] = useState('');
   const [role, setRole] = useState('Colaborador');
-  const [workModel, setWorkModel] = useState<WorkModel>('presencial');
   const [startTime, setStartTime] = useState('08:00');
   const [endTime, setEndTime] = useState('17:00');
   const [showPassword, setShowPassword] = useState(false);
@@ -74,7 +73,6 @@ export function AjustesTab({
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState('');
-  const [editWorkModel, setEditWorkModel] = useState<WorkModel>('presencial');
   const [editTeam, setEditTeam] = useState('Operações de Loja');
   const [editCustomTeam, setEditCustomTeam] = useState('');
   const [editStartTime, setEditStartTime] = useState('08:00');
@@ -146,7 +144,6 @@ export function AjustesTab({
     setTeam('Operações de Loja');
     setCustomTeam('');
     setRole('Colaborador');
-    setWorkModel('presencial');
     setStartTime('08:00');
     setEndTime('17:00');
     setModalError('');
@@ -202,7 +199,6 @@ export function AjustesTab({
         team: finalTeam,
         role: role.trim() || 'Colaborador',
         workHours: `${startTime} às ${endTime}`,
-        workModel,
       });
 
       if (error || !newEmp) {
@@ -225,7 +221,6 @@ export function AjustesTab({
     setEditingEmployee(emp);
     setEditName(emp.name);
     setEditRole(emp.role);
-    setEditWorkModel(emp.workModel || 'presencial');
     if (availableTeams.includes(emp.team || '')) {
       setEditTeam(emp.team || 'Operações de Loja');
       setEditCustomTeam('');
@@ -257,7 +252,6 @@ export function AjustesTab({
       role: editRole.trim() || editingEmployee.role,
       team: finalTeam || editingEmployee.team,
       workHours: `${editStartTime} às ${editEndTime}`,
-      workModel: editWorkModel,
       initials: (editName.trim() || editingEmployee.name)
         .split(' ')
         .map(n => n[0])
@@ -424,13 +418,6 @@ export function AjustesTab({
                     <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
                       <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold border border-slate-200">
                         {emp.role}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 text-[10px] font-medium border border-slate-200">
-                        {emp.workModel === 'home_office'
-                          ? 'Home office'
-                          : emp.workModel === 'hibrido'
-                          ? 'Híbrido'
-                          : 'Presencial'}
                       </span>
                       <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200 font-mono">
                         {emp.workHours || '08:00 às 17:00'}
@@ -786,33 +773,6 @@ export function AjustesTab({
                 </div>
               </div>
 
-              {/* Modalidade de Trabalho Padrão */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  Modalidade de Trabalho
-                </label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {[
-                    { id: 'presencial', label: 'Presencial' },
-                    { id: 'home_office', label: 'Home office' },
-                    { id: 'hibrido', label: 'Híbrido' },
-                  ].map(m => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setWorkModel(m.id as WorkModel)}
-                      className={`h-9 px-2 rounded-xl text-xs font-bold border transition-all ${
-                        workModel === m.id
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Horário Habitual de Trabalho */}
               <div className="flex flex-col gap-1.5 p-3 rounded-2xl bg-slate-50 border border-slate-200">
                 <label className="text-xs font-bold text-slate-700">
@@ -962,33 +922,6 @@ export function AjustesTab({
                     onChange={e => setEditRole(e.target.value)}
                     className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
-                </div>
-              </div>
-
-              {/* Modalidade de Trabalho Padrão */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  Modalidade de Trabalho
-                </label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {[
-                    { id: 'presencial', label: 'Presencial' },
-                    { id: 'home_office', label: 'Home office' },
-                    { id: 'hibrido', label: 'Híbrido' },
-                  ].map(m => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setEditWorkModel(m.id as WorkModel)}
-                      className={`h-9 px-2 rounded-xl text-xs font-bold border transition-all ${
-                        editWorkModel === m.id
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
                 </div>
               </div>
 

@@ -225,7 +225,7 @@ function EscalaPublicaContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col antialiased select-none pb-12">
+    <div className="min-h-screen bg-slate-50 flex flex-col antialiased pb-12">
       {/* Topo Público de Identificação */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_1px_6px_rgba(0,0,0,0.03)]">
         <div className="h-16 max-w-4xl mx-auto px-4 sm:px-6 flex items-center justify-between">

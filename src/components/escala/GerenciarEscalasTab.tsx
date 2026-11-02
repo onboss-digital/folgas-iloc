@@ -64,6 +64,7 @@ interface GerenciarEscalasTabProps {
   onNavigateToAjustes?: () => void;
   shiftSwaps?: ShiftSwapRequest[];
   onOpenAdminTrocas?: () => void;
+  onDeleteSchedule?: (weekId: string) => void;
 }
 
 interface QuickDayEditor {
@@ -149,6 +150,7 @@ export function GerenciarEscalasTab({
   onNavigateToAjustes,
   shiftSwaps = [],
   onOpenAdminTrocas,
+  onDeleteSchedule,
 }: GerenciarEscalasTabProps) {
   // Quantidade de trocas de escalas aguardando aprovação do administrador
   const pendingAdminSwapsCount = shiftSwaps.filter(
@@ -184,6 +186,13 @@ export function GerenciarEscalasTab({
   // Modal de conferência pré-publicação
   const [isPublishModalOpen, setIsPublishModalOpen] = useState<boolean>(false);
 
+  // Modal de confirmação de exclusão de escala
+  const [isDeleteScheduleModalOpen, setIsDeleteScheduleModalOpen] = useState<boolean>(false);
+
+  // Estados de modalidade no editor semanal do colaborador
+  const [weekEditorWorkModels, setWeekEditorWorkModels] = useState<(WorkModel | undefined)[]>([]);
+  const [weekEditorWorkModelType, setWeekEditorWorkModelType] = useState<WorkModel>('presencial');
+
   // Estados do Modal de Cadastro / Edição de Colaborador
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
   const [editingEmployeeData, setEditingEmployeeData] = useState<Employee | null>(null);
@@ -192,7 +201,6 @@ export function GerenciarEscalasTab({
   const [empTeam, setEmpTeam] = useState('Operações de Loja');
   const [empStartTime, setEmpStartTime] = useState('08:00');
   const [empEndTime, setEmpEndTime] = useState('17:00');
-  const [empWorkModel, setEmpWorkModel] = useState<WorkModel>('presencial');
 
   // Confirmação de exclusão de colaborador
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
@@ -218,7 +226,6 @@ export function GerenciarEscalasTab({
     setEmpTeam(selectedTeam !== 'todas' ? selectedTeam : 'Operações de Loja');
     setEmpStartTime('08:00');
     setEmpEndTime('17:00');
-    setEmpWorkModel('presencial');
     setIsEmployeeModalOpen(true);
   };
 
@@ -239,7 +246,6 @@ export function GerenciarEscalasTab({
     }
     setEmpStartTime(start);
     setEmpEndTime(end);
-    setEmpWorkModel(emp.workModel || 'presencial');
     setIsEmployeeModalOpen(true);
   };
 
@@ -261,7 +267,6 @@ export function GerenciarEscalasTab({
           role: cleanRole,
           team: cleanTeam,
           workHours: workHoursFormatted,
-          workModel: empWorkModel,
         });
       }
     } else {
@@ -281,7 +286,6 @@ export function GerenciarEscalasTab({
           role: cleanRole,
           team: cleanTeam,
           workHours: workHoursFormatted,
-          workModel: empWorkModel,
           status: 'active',
           initials,
           colorBg,
@@ -471,10 +475,50 @@ export function GerenciarEscalasTab({
     const currentCustom = [
       ...(schedule.customHours?.[emp.id] || Array(7).fill(undefined)),
     ];
+    const currentModels = [
+      ...(schedule.workModels?.[emp.id] || Array(7).fill(undefined)),
+    ];
+
+    // Preenche com 'presencial' como padrão se estiver em trabalho
+    for (let i = 0; i < 7; i++) {
+      if (currentShifts[i] === 'T' && !currentModels[i]) {
+        currentModels[i] = 'presencial';
+      }
+    }
+
+    // Identifica o tipo inicial de modalidade para a semana
+    const workDaysModels = currentModels.filter((_, i) => currentShifts[i] === 'T');
+    const hasHome = workDaysModels.some(m => m === 'home_office');
+    const hasPres = workDaysModels.some(m => m === 'presencial' || !m);
+    let initialType: WorkModel = 'presencial';
+    if (hasHome && hasPres) initialType = 'hibrido';
+    else if (hasHome) initialType = 'home_office';
 
     setEditingEmployeeWeek(emp);
     setWeekEditorShifts(currentShifts);
     setWeekEditorCustomHours(currentCustom);
+    setWeekEditorWorkModels(currentModels);
+    setWeekEditorWorkModelType(initialType);
+  };
+
+  const handleSelectWeekWorkModelType = (type: WorkModel) => {
+    setWeekEditorWorkModelType(type);
+    const updated = [...weekEditorWorkModels];
+    for (let i = 0; i < 7; i++) {
+      if (weekEditorShifts[i] === 'T') {
+        if (type === 'presencial') updated[i] = 'presencial';
+        else if (type === 'home_office') updated[i] = 'home_office';
+        else if (type === 'hibrido' && !updated[i]) updated[i] = i % 2 === 0 ? 'presencial' : 'home_office';
+      }
+    }
+    setWeekEditorWorkModels(updated);
+  };
+
+  const handleSetDayWorkModel = (dayIdx: number, model: WorkModel) => {
+    const updated = [...weekEditorWorkModels];
+    updated[dayIdx] = model;
+    setWeekEditorWorkModels(updated);
+    setWeekEditorWorkModelType('hibrido');
   };
 
   // Salvar alterações da semana do colaborador
@@ -490,6 +534,10 @@ export function GerenciarEscalasTab({
       customHours: {
         ...(schedule.customHours || {}),
         [editingEmployeeWeek.id]: weekEditorCustomHours,
+      },
+      workModels: {
+        ...(schedule.workModels || {}),
+        [editingEmployeeWeek.id]: weekEditorWorkModels,
       },
     };
 
@@ -827,11 +875,21 @@ export function GerenciarEscalasTab({
           </div>
 
           {/* Botões de Ação do Administrador */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              type="button"
+              onClick={onCopyPreviousWeek}
+              className="h-10 px-3.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 active:scale-95 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+              title="Copiar horários e folgas da semana anterior como modelo"
+            >
+              <Copy className="w-3.5 h-3.5 text-blue-600" />
+              <span>Duplicar Semana Anterior</span>
+            </button>
+
             <button
               type="button"
               onClick={() => onSaveDraft(schedule)}
-              className="h-10 px-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 active:scale-95 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+              className="h-10 px-3.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 active:scale-95 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
             >
               <Save className="w-3.5 h-3.5 text-slate-600" />
               <span>Salvar Rascunho</span>
@@ -845,6 +903,18 @@ export function GerenciarEscalasTab({
               <Send className="w-3.5 h-3.5 text-white" />
               <span>Publicar Escala</span>
             </button>
+
+            {onDeleteSchedule && (
+              <button
+                type="button"
+                onClick={() => setIsDeleteScheduleModalOpen(true)}
+                className="h-10 px-3 rounded-xl bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-300 text-rose-600 active:scale-95 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                title="Excluir a programação desta semana"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <span>Remover</span>
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -965,7 +1035,7 @@ export function GerenciarEscalasTab({
                             {/* Bloco Interativo do Dia: 1 clique altera entre Trabalho e Folga */}
                             <div
                               onClick={(e) => handleQuickToggleShift(e, emp, dayIdx)}
-                              className={`group relative w-full min-h-[58px] p-2 rounded-2xl border text-center flex flex-col items-center justify-center cursor-pointer select-none transition-all active:scale-95 shadow-2xs ${
+                              className={`group relative w-full min-h-[58px] p-2 rounded-2xl border text-center flex flex-col items-center justify-center cursor-pointer transition-all active:scale-95 shadow-2xs ${
                                 status === 'F'
                                   ? 'bg-rose-50 hover:bg-rose-100/90 border-rose-200/90 text-rose-700 hover:ring-2 hover:ring-rose-300'
                                   : status === 'AUSENTE'
@@ -1322,6 +1392,46 @@ export function GerenciarEscalasTab({
               </button>
             </div>
 
+            {/* Configuração de Modalidade de Trabalho da Semana */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800">
+                  Modalidade de Trabalho desta Semana:
+                </span>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  {weekEditorWorkModelType === 'hibrido'
+                    ? 'Trabalho híbrido: defina quais dias são presenciais e quais são remotos abaixo'
+                    : `Turno 100% ${weekEditorWorkModelType === 'home_office' ? 'Home office' : 'Presencial'}`}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'presencial', label: 'Presencial', desc: 'Presencial na empresa' },
+                  { id: 'home_office', label: 'Home office', desc: 'Trabalho remoto' },
+                  { id: 'hibrido', label: 'Híbrido', desc: 'Presencial + Remoto por dia' },
+                ].map(m => {
+                  const isSel = weekEditorWorkModelType === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => handleSelectWeekWorkModelType(m.id as WorkModel)}
+                      className={`p-2 rounded-xl text-xs font-bold border transition-all text-center flex flex-col items-center gap-0.5 ${
+                        isSel
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                          : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      <span>{m.label}</span>
+                      <span className={`text-[9px] font-normal ${isSel ? 'text-blue-100' : 'text-slate-400'}`}>
+                        {m.desc}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Presets Rápidos */}
             <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 flex flex-col gap-1.5">
               <span className="text-[11px] font-bold text-blue-900 uppercase">
@@ -1441,7 +1551,34 @@ export function GerenciarEscalasTab({
                     </div>
 
                     {status === 'T' ? (
-                      <div className="flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {weekEditorWorkModelType === 'hibrido' && (
+                          <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200 shadow-2xs">
+                            <button
+                              type="button"
+                              onClick={() => handleSetDayWorkModel(idx, 'presencial')}
+                              className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all ${
+                                (weekEditorWorkModels[idx] || 'presencial') === 'presencial'
+                                  ? 'bg-slate-800 text-white shadow-2xs'
+                                  : 'text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              Presencial
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSetDayWorkModel(idx, 'home_office')}
+                              className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all ${
+                                weekEditorWorkModels[idx] === 'home_office'
+                                  ? 'bg-blue-600 text-white shadow-2xs'
+                                  : 'text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              Remoto
+                            </button>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
                         <Clock className="w-3 h-3 text-emerald-700" />
                         <input
                           type="time"
@@ -1464,6 +1601,7 @@ export function GerenciarEscalasTab({
                           }}
                           className="bg-white border border-slate-200 rounded px-1 text-xs font-bold text-slate-800"
                         />
+                      </div>
                       </div>
                     ) : (
                       <span className="text-[11px] font-semibold text-slate-400 italic">
@@ -1562,36 +1700,6 @@ export function GerenciarEscalasTab({
                   placeholder="Ex: Operações de Loja, Vendas, Estoque..."
                   className="w-full h-11 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                 />
-              </div>
-
-              {/* Modalidade de Trabalho Habitual */}
-              <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-100">
-                <label className="text-xs font-semibold text-slate-700">
-                  Modalidade de Trabalho Padrão
-                </label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {[
-                    { id: 'presencial', label: 'Presencial' },
-                    { id: 'home_office', label: 'Home office' },
-                    { id: 'hibrido', label: 'Híbrido' },
-                  ].map(m => {
-                    const isSel = empWorkModel === m.id;
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setEmpWorkModel(m.id as WorkModel)}
-                        className={`h-10 px-2 rounded-xl text-xs font-bold border transition-all text-center ${
-                          isSel
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
-                        }`}
-                      >
-                        {m.label}
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
 
               {/* Horário de Trabalho */}
@@ -1800,6 +1908,69 @@ export function GerenciarEscalasTab({
                 className="flex-1 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs"
               >
                 Confirmar e Publicar Agora
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ==============================================================
+          8. MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DA ESCALA
+          ============================================================== */}
+      {isDeleteScheduleModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl border border-slate-200 flex flex-col gap-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-6 h-6 text-rose-600" />
+              </div>
+              <div className="flex flex-col">
+                <h3 className="text-base font-black text-slate-900">
+                  {schedule.isPublished ? 'Remover Escala Publicada?' : 'Excluir Rascunho da Escala?'}
+                </h3>
+                <span className="text-xs text-slate-500">
+                  {weekHeader.monthTitle} • {weekHeader.weekSubtitle}
+                </span>
+              </div>
+            </div>
+
+            {schedule.isPublished ? (
+              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-900 flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 font-black text-rose-800">
+                  <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                  <span>Atenção: Impacto para a Equipe</span>
+                </div>
+                <p className="leading-relaxed text-rose-800">
+                  Esta programação já está <strong>publicada oficialmente</strong>. Ao removê-la, os colaboradores da equipe deixarão de visualizar suas folgas e horários para o período de <strong>{weekHeader.periodText}</strong>.
+                </p>
+                <p className="text-[11px] text-rose-700">
+                  As escalas das outras semanas anteriores e futuras continuarão totalmente preservadas.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Tem certeza de que deseja remover esta programação semanal? O rascunho será excluído e você poderá recriá-lo quando desejar.
+              </p>
+            )}
+
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsDeleteScheduleModalOpen(false)}
+                className="flex-1 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteSchedule) {
+                    onDeleteSchedule(schedule.weekId);
+                  }
+                  setIsDeleteScheduleModalOpen(false);
+                }}
+                className="flex-1 h-10 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs"
+              >
+                {schedule.isPublished ? 'Sim, Remover Escala' : 'Sim, Excluir Rascunho'}
               </button>
             </div>
           </div>

@@ -33,6 +33,7 @@ interface EscalaTabProps {
   onSaveDraft?: (schedule: WeekSchedule) => void;
   onPublishSchedule?: (schedule: WeekSchedule) => void;
   onCopyPreviousWeek?: () => void;
+  onDeleteSchedule?: (weekId: string) => void;
   onAddEmployee?: (employee: Omit<Employee, 'id'>) => void;
   onUpdateEmployee?: (employee: Employee) => void;
   onDeleteEmployee?: (id: string) => void;
@@ -59,6 +60,7 @@ export function EscalaTab({
   onSaveDraft,
   onPublishSchedule,
   onCopyPreviousWeek,
+  onDeleteSchedule,
   onAddEmployee,
   onUpdateEmployee,
   onDeleteEmployee,
@@ -138,6 +140,7 @@ export function EscalaTab({
           onSaveDraft={onSaveDraft || (() => {})}
           onPublishSchedule={onPublishSchedule || (() => {})}
           onCopyPreviousWeek={onCopyPreviousWeek || (() => {})}
+          onDeleteSchedule={onDeleteSchedule}
           currentUser={currentUser}
           onPreviewAsColaborador={() => setAdminViewMode('preview')}
           onAddEmployee={onAddEmployee}

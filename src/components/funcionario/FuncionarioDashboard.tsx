@@ -41,12 +41,21 @@ export function FuncionarioDashboard({
   onOpenSolicitarTroca,
   onOpenMinhasTrocas,
 }: FuncionarioDashboardProps) {
-  // Índice do dia em exibição (começa exatamente em todayIndex)
-  const [viewingDayIdx, setViewingDayIdx] = useState<number>(todayIndex);
+  // Índice do dia em exibição (começa exatamente no dia de hoje)
+  const [viewingDayIdx, setViewingDayIdx] = useState<number>(() => {
+    return todayIndex >= 0 && todayIndex < days.length ? todayIndex : 0;
+  });
+
+  // Sincroniza quando os dias ou todayIndex mudarem
+  React.useEffect(() => {
+    if (todayIndex >= 0 && todayIndex < days.length) {
+      setViewingDayIdx(todayIndex);
+    }
+  }, [todayIndex, days.length]);
 
   const activeEmployees = allEmployees.filter(e => e.status === 'active');
-  const isViewingToday = viewingDayIdx === todayIndex;
   const currentDayInfo = days[viewingDayIdx] || days[0];
+  const isViewingToday = Boolean(currentDayInfo?.isToday);
 
   // Identifica o colaborador logado para destacar sua visão pessoal
   const loggedEmployee = allEmployees.find(

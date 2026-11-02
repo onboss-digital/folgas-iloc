@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ActiveTab, Employee, ShiftStatus, WeekSchedule, CompanySettings, AuthUser, ShiftSwapRequest, AppNotification } from '../types';
+import { ActiveTab, Employee, ShiftStatus, WeekSchedule, CompanySettings, AuthUser, ShiftSwapRequest, AppNotification, WorkModel } from '../types';
 import {
   INITIAL_EMPLOYEES,
   INITIAL_SETTINGS,
@@ -41,6 +41,8 @@ import {
   saveNotificationToSupabase,
   markNotificationAsReadInSupabase,
   markAllNotificationsAsReadInSupabase,
+  isSupabaseConfigured,
+  supabase,
 } from '../lib/supabase';
 
 export default function Home() {
@@ -52,7 +54,7 @@ export default function Home() {
   const [schedulesMap, setSchedulesMap] = useState<Record<string, WeekSchedule>>({});
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [toast, setToast] = useState<ToastMessage | null>(null);
-  const [todayStr, setTodayStr] = useState<string>('2026-10-29');
+  const [todayStr, setTodayStr] = useState<string>(() => getTodayStr());
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [shiftSwaps, setShiftSwaps] = useState<ShiftSwapRequest[]>([]);
   const [isSolicitarTrocaOpen, setIsSolicitarTrocaOpen] = useState<boolean>(false);
@@ -77,11 +79,12 @@ export default function Home() {
 
   const unreadNotificationsCount = userNotifications.filter(n => !n.read).length;
 
-  // Calcula dados da semana atual baseados no weekOffset
-  const currentWeekInfo = getWeekDateRange(weekOffset);
+  // Calcula dados da semana atual baseados no weekOffset e fuso configurado
+  const currentWeekInfo = getWeekDateRange(weekOffset, todayStr, settings.timezonePreference);
   const startDateStr = currentWeekInfo.startDateStr;
   const days = getWeekDays(startDateStr, todayStr);
-  const todayIndex = days.findIndex(d => d.isToday) !== -1 ? days.findIndex(d => d.isToday) : 3;
+  const foundTodayIdx = days.findIndex(d => d.isToday);
+  const todayIndex = foundTodayIdx !== -1 ? foundTodayIdx : 0;
 
   // Escala correspondente a semana navegada
   const schedule: WeekSchedule = schedulesMap[currentWeekInfo.weekId] || {
@@ -117,11 +120,8 @@ export default function Home() {
   useEffect(() => {
     const initData = async () => {
       try {
-        const now = new Date();
-        const y = now.getFullYear();
-        const m = String(now.getMonth() + 1).padStart(2, '0');
-        const d = String(now.getDate()).padStart(2, '0');
-        setTodayStr(`${y}-${m}-${d}`);
+        const realToday = getTodayStr(settings.timezonePreference);
+        setTodayStr(realToday);
 
         // 1. Limpeza automática imediata de dados mock/demo legados do navegador
         const legacyMockIds = ['thiago', 'carlos', 'pedro', 'joao', 'paulo', 'mariana'];
@@ -619,20 +619,21 @@ export default function Home() {
   };
 
   const handleCopyPreviousWeek = () => {
-    const prevWeekInfo = getWeekDateRange(weekOffset - 1);
+    const prevWeekInfo = getWeekDateRange(weekOffset - 1, todayStr, settings.timezonePreference);
     const prevSchedule = schedulesMap[prevWeekInfo.weekId];
 
     if (!prevSchedule) {
-      showToast('Nenhuma escala anterior encontrada para copiar.', 'warning');
+      showToast('Nenhuma escala anterior encontrada para duplicar.', 'warning');
       return;
     }
 
     const activeEmpIds = new Set(employees.filter(e => e.status === 'active').map(e => e.id));
     const copiedShifts: Record<string, ShiftStatus[]> = {};
     const copiedCustomHours: Record<string, (string | undefined)[]> = {};
+    const copiedWorkModels: Record<string, (WorkModel | undefined)[]> = {};
 
     activeEmpIds.forEach(id => {
-      if (prevSchedule.shifts[id]) {
+      if (prevSchedule.shifts && prevSchedule.shifts[id]) {
         copiedShifts[id] = [...prevSchedule.shifts[id]];
       } else {
         copiedShifts[id] = Array(7).fill('T');
@@ -641,17 +642,44 @@ export default function Home() {
       if (prevSchedule.customHours && prevSchedule.customHours[id]) {
         copiedCustomHours[id] = [...prevSchedule.customHours[id]];
       }
+
+      if (prevSchedule.workModels && prevSchedule.workModels[id]) {
+        copiedWorkModels[id] = [...prevSchedule.workModels[id]];
+      }
     });
 
     const updatedSchedule: WeekSchedule = {
       ...schedule,
       shifts: copiedShifts,
       customHours: copiedCustomHours,
+      workModels: copiedWorkModels,
       isPublished: false,
     };
 
     persistSchedule(updatedSchedule);
-    showToast('Escala da semana anterior copiada com sucesso.', 'success');
+    showToast('Escala da semana anterior duplicada com sucesso para a semana atual.', 'success');
+  };
+
+  const handleDeleteSchedule = async (weekId: string) => {
+    // 1. Remove do mapa local
+    const updatedMap = { ...schedulesMap };
+    delete updatedMap[weekId];
+    setSchedulesMap(updatedMap);
+
+    try {
+      localStorage.setItem('iloc_schedules_map', JSON.stringify(updatedMap));
+    } catch {}
+
+    // 2. Remove do Supabase
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await supabase.from('schedules').delete().eq('week_id', weekId);
+      } catch (err) {
+        console.warn('Aviso ao excluir escala do banco:', err);
+      }
+    }
+
+    showToast('Programação da semana removida com sucesso.', 'info');
   };
 
   const handleTogglePublicShare = (enabled: boolean) => {
@@ -943,6 +971,7 @@ export default function Home() {
             onCreateScheduleForWeek={handleCreateScheduleForWeek}
             onNavigateToAjustes={() => setActiveTab('ajustes')}
             shiftSwaps={shiftSwaps}
+            onDeleteSchedule={handleDeleteSchedule}
             onOpenAdminTrocas={() => setIsAdminTrocasOpen(true)}
             onOpenSolicitarTroca={() => setIsSolicitarTrocaOpen(true)}
             onOpenMinhasTrocas={() => setIsMinhasTrocasOpen(true)}

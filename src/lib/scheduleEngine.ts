@@ -1,4 +1,5 @@
-import { Employee, ShiftStatus, WeekSchedule, CompanySettings, DayInfo, ShiftSwapRequest } from '../types';
+import { Employee, ShiftStatus, WeekSchedule, CompanySettings, DayInfo, ShiftSwapRequest, TimezonePreference } from '../types';
+import { getTodayStr } from './dateUtils';
 import { getHolidayInfo } from './holidays';
 
 export const DAY_NAMES = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'] as const;
@@ -202,39 +203,73 @@ export const INITIAL_SCHEDULE_HISTORY: Record<string, WeekSchedule> = {
   },
 };
 
-export function getWeekDateRange(weekOffset: number) {
-  const base = new Date(2026, 9, 26 + weekOffset * 7);
-  const yyyy = base.getFullYear();
-  const mm = String(base.getMonth() + 1).padStart(2, '0');
-  const dd = String(base.getDate()).padStart(2, '0');
-  const startDateStr = `${yyyy}-${mm}-${dd}`;
+/**
+ * Calcula o número e ano da semana segundo o padrão ISO 8601
+ */
+export function getISOWeekNumber(d: Date): { weekNumber: number; weekYear: number } {
+  const target = new Date(d.valueOf());
+  const dayNr = (d.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNr + 3);
+  const firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() !== 4) {
+    target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+  }
+  const weekNumber = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+  return { weekNumber, weekYear: target.getFullYear() };
+}
 
-  const endDate = new Date(base);
-  endDate.setDate(base.getDate() + 6);
-  const endY = endDate.getFullYear();
-  const endM = String(endDate.getMonth() + 1).padStart(2, '0');
-  const endD = String(endDate.getDate()).padStart(2, '0');
+/**
+ * Calcula dinamicamente o intervalo de datas de uma semana baseado na Segunda-feira de referência
+ */
+export function getWeekDateRange(
+  weekOffset: number,
+  referenceDateStr?: string,
+  preference: TimezonePreference = 'brasilia'
+) {
+  const refDateStr = referenceDateStr || getTodayStr(preference);
+  const [y, m, d] = refDateStr.split('-').map(Number);
+  // Usa meio-dia (12:00) para neutralizar transições de horário e diferenças de fuso
+  const refDate = new Date(y, m - 1, d, 12, 0, 0);
+
+  // Segunda-feira da semana de referência (0 = Domingo, 1 = Segunda, ..., 6 = Sábado)
+  const dayOfWeek = refDate.getDay();
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(y, m - 1, d + diffToMonday + weekOffset * 7, 12, 0, 0);
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 12, 0, 0);
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const startY = monday.getFullYear();
+  const startM = pad(monday.getMonth() + 1);
+  const startD = pad(monday.getDate());
+  const startDateStr = `${startY}-${startM}-${startD}`;
+
+  const endY = sunday.getFullYear();
+  const endM = pad(sunday.getMonth() + 1);
+  const endD = pad(sunday.getDate());
   const endDateStr = `${endY}-${endM}-${endD}`;
 
-  const weekNumber = 44 + weekOffset;
-  const weekId = `${yyyy}-W${weekNumber}`;
+  const { weekNumber, weekYear } = getISOWeekNumber(monday);
+  const weekId = `${weekYear}-W${pad(weekNumber)}`;
 
   return {
     startDateStr,
     endDateStr,
     weekNumber,
     weekId,
-    periodText: `${dd}/${mm} a ${endD}/${endM}/${endY}`,
+    periodText: `${startD}/${startM} a ${endD}/${endM}/${endY}`,
   };
 }
 
+/**
+ * Retorna os 7 dias da semana (Segunda a Domingo) com suas respectivas datas e informações de feriados
+ */
 export function getWeekDays(startDateStr: string, todayStr?: string): DayInfo[] {
   const parts = startDateStr.split('-').map(Number);
-  const baseDate = new Date(parts[0], parts[1] - 1, parts[2]);
+  const baseDate = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
 
   return DAY_NAMES.map((name, i) => {
-    const d = new Date(baseDate);
-    d.setDate(baseDate.getDate() + i);
+    const d = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + i, 12, 0, 0);
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
@@ -248,7 +283,7 @@ export function getWeekDays(startDateStr: string, todayStr?: string): DayInfo[] 
       formattedDate: `${dd}/${mm}`,
       dayNumber: d.getDate(),
       isWeekend: i === 5 || i === 6,
-      isToday: todayStr ? fullDate === todayStr : i === 3,
+      isToday: Boolean(todayStr && fullDate === todayStr),
       isHoliday: holidayInfo.isHoliday,
       holidayName: holidayInfo.holidayName,
     };
