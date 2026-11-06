@@ -32,7 +32,9 @@ import {
   updateUserProfile,
   fetchEmployeesFromSupabase,
   fetchScheduleFromSupabase,
+  fetchAllSchedulesFromSupabase,
   saveScheduleToSupabase,
+  publishScheduleViaApi,
   fetchSettingsFromSupabase,
   saveSettingsToSupabase,
   fetchShiftSwapsFromSupabase,
@@ -62,6 +64,7 @@ export default function Home() {
   const [isAdminTrocasOpen, setIsAdminTrocasOpen] = useState<boolean>(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
+  const [isPublishing, setIsPublishing] = useState<boolean>(false);
 
   // Identificação do colaborador logado
   const loggedEmp = employees.find(
@@ -207,11 +210,31 @@ export default function Home() {
           } catch {}
         }
 
-        const cloudCurrentSchedule = await fetchScheduleFromSupabase(currentWeekInfo.weekId);
-        if (cloudCurrentSchedule) {
-          loadedMap[cloudCurrentSchedule.weekId] = cloudCurrentSchedule;
+        const userRole = currentUser?.role || 'admin';
+        const cloudSchedules = await fetchAllSchedulesFromSupabase(userRole);
+        if (cloudSchedules && cloudSchedules.length > 0) {
+          loadedMap = {};
+          cloudSchedules.forEach(s => {
+            loadedMap[s.weekId] = s;
+          });
+        } else if (cloudSchedules && cloudSchedules.length === 0) {
+          // O banco de dados está intencionalmente zerado
+          loadedMap = {};
+        } else {
+          const cloudCurrentSchedule = await fetchScheduleFromSupabase(currentWeekInfo.weekId);
+          if (cloudCurrentSchedule) {
+            loadedMap[cloudCurrentSchedule.weekId] = cloudCurrentSchedule;
+          }
         }
         setSchedulesMap(loadedMap);
+        try {
+          localStorage.setItem('iloc_schedules_map', JSON.stringify(loadedMap));
+          if (loadedMap[currentWeekInfo.weekId]) {
+            localStorage.setItem('iloc_schedule', JSON.stringify(loadedMap[currentWeekInfo.weekId]));
+          } else {
+            localStorage.removeItem('iloc_schedule');
+          }
+        } catch {}
       } catch (err) {
         console.warn('Aviso na inicialização dos dados:', err);
       } finally {
@@ -220,6 +243,20 @@ export default function Home() {
     };
 
     initData();
+  }, []);
+
+  // Carrega escala dinamicamente ao navegar semanas ainda não cacheadas
+  useEffect(() => {
+    const targetWeekId = currentWeekInfo.weekId;
+    if (!targetWeekId || schedulesMap[targetWeekId]) return;
+    fetchScheduleFromSupabase(targetWeekId).then(cloudSched => {
+      if (cloudSched) {
+        setSchedulesMap(prev => ({
+          ...prev,
+          [cloudSched.weekId]: cloudSched,
+        }));
+      }
+    }).catch(() => {});
   }, [currentWeekInfo.weekId]);
 
   const handleLoginSuccess = (user: AuthUser) => {
@@ -253,7 +290,7 @@ export default function Home() {
     saveSettingsToSupabase(newSettings).catch(() => {});
   };
 
-  const persistSchedule = (newSchedule: WeekSchedule) => {
+  const persistScheduleAsync = async (newSchedule: WeekSchedule): Promise<boolean> => {
     const updatedMap = {
       ...schedulesMap,
       [newSchedule.weekId]: newSchedule,
@@ -261,12 +298,21 @@ export default function Home() {
     setSchedulesMap(updatedMap);
     try {
       localStorage.setItem('iloc_schedules_map', JSON.stringify(updatedMap));
-      // Garante que a escala ativa/publicada seja gravada para acesso direto
       localStorage.setItem('iloc_schedule', JSON.stringify(newSchedule));
     } catch {}
 
-    // Sincronização em nuvem quando Supabase estiver disponível
-    saveScheduleToSupabase(newSchedule).catch(() => {});
+    const res = await saveScheduleToSupabase(newSchedule);
+    return res.success;
+  };
+
+  const persistSchedule = (newSchedule: WeekSchedule) => {
+    persistScheduleAsync(newSchedule).catch(err => {
+      console.warn('Aviso ao sincronizar escala no Supabase:', err);
+    });
+  };
+
+  const handleUpdateSchedule = (updatedSchedule: WeekSchedule) => {
+    persistSchedule(updatedSchedule);
   };
 
   const persistShiftSwaps = (updatedSwaps: ShiftSwapRequest[]) => {
@@ -545,10 +591,10 @@ export default function Home() {
     showToast('Rascunho da escala salvo com sucesso.', 'success');
   };
 
-  const handlePublishSchedule = (newSchedule: WeekSchedule) => {
+  const handlePublishSchedule = async (newSchedule: WeekSchedule): Promise<boolean> => {
     if (currentUser?.role !== 'admin') {
       showToast('Apenas o administrador possui permissão para publicar e gerar o link da escala.', 'warning');
-      return;
+      return false;
     }
 
     const activeEmps = employees.filter(e => e.status === 'active');
@@ -560,23 +606,34 @@ export default function Home() {
       showToast(`Atenção: Os dias ${names} estão abaixo do mínimo de ${settings.minStaffPerDay} pessoas.`, 'warning');
     }
 
-    const isAlreadyPublished = Boolean(newSchedule.isPublished && newSchedule.publishedAt);
-    const generatedToken = newSchedule.shareToken || `escala-semana-${newSchedule.weekNumber}-${Date.now().toString(36)}`;
+    setIsPublishing(true);
+    try {
+      const result = await publishScheduleViaApi(newSchedule, currentUser?.email);
+      if (!result.success || !result.schedule) {
+        showToast(result.error || 'Não foi possível confirmar a publicação no banco de dados.', 'warning');
+        return false;
+      }
 
-    const updatedSchedule: WeekSchedule = {
-      ...newSchedule,
-      isPublished: true,
-      isPublicShareEnabled: true,
-      shareToken: generatedToken,
-      publishedAt: getNowIso(settings.timezonePreference),
-    };
-    persistSchedule(updatedSchedule);
+      const publishedSchedule = result.schedule;
+      const updatedMap = {
+        ...schedulesMap,
+        [publishedSchedule.weekId]: publishedSchedule,
+      };
+      setSchedulesMap(updatedMap);
+      try {
+        localStorage.setItem('iloc_schedules_map', JSON.stringify(updatedMap));
+        localStorage.setItem('iloc_schedule', JSON.stringify(publishedSchedule));
+      } catch {}
 
-    if (isAlreadyPublished) {
-      showToast('Escala atualizada e sincronizada com sucesso!', 'success');
-    } else {
-      showToast('Escala publicada com sucesso! Link exclusivo gerado.', 'success');
+      showToast('Escala publicada e sincronizada com sucesso!', 'success');
       setIsShareModalOpen(true);
+      return true;
+    } catch (err: any) {
+      console.error('Erro na publicação da escala:', err);
+      showToast(err.message || 'Erro ao publicar a escala.', 'warning');
+      return false;
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -952,6 +1009,8 @@ export default function Home() {
             shiftSwaps={shiftSwaps}
             onOpenSolicitarTroca={() => setIsSolicitarTrocaOpen(true)}
             onOpenMinhasTrocas={() => setIsMinhasTrocasOpen(true)}
+            onNavigateToEscala={() => setActiveTab('escala')}
+            allSchedules={schedulesMap}
           />
         )}
 
@@ -968,6 +1027,8 @@ export default function Home() {
             currentUser={currentUser}
             onCopySuccess={() => showToast('Link da escala copiado com sucesso.', 'success')}
             onSaveDraft={handleSaveDraft}
+            onUpdateSchedule={handleUpdateSchedule}
+            isPublishing={isPublishing}
             onPublishSchedule={handlePublishSchedule}
             onCopyPreviousWeek={handleCopyPreviousWeek}
             onAddEmployee={handleAddEmployee}
