@@ -31,6 +31,8 @@ import { NotificacoesModal } from '../components/notifications/NotificacoesModal
 import {
   updateUserProfile,
   fetchEmployeesFromSupabase,
+  saveEmployeeToSupabase,
+  deleteEmployeeFromSupabase,
   fetchScheduleFromSupabase,
   fetchAllSchedulesFromSupabase,
   saveScheduleToSupabase,
@@ -155,6 +157,7 @@ export default function Home() {
         }
 
         // 2. Recupera sessão salva
+        let currentSessionUser: AuthUser | null = null;
         const savedAuth = localStorage.getItem('iloc_auth_user');
         if (savedAuth) {
           try {
@@ -163,6 +166,7 @@ export default function Home() {
               localStorage.removeItem('iloc_auth_user');
               setCurrentUser(null);
             } else {
+              currentSessionUser = parsed;
               setCurrentUser(parsed);
             }
           } catch {
@@ -210,16 +214,12 @@ export default function Home() {
           } catch {}
         }
 
-        const userRole = currentUser?.role || 'admin';
+        const userRole = currentSessionUser?.role || 'admin';
         const cloudSchedules = await fetchAllSchedulesFromSupabase(userRole);
         if (cloudSchedules && cloudSchedules.length > 0) {
-          loadedMap = {};
           cloudSchedules.forEach(s => {
             loadedMap[s.weekId] = s;
           });
-        } else if (cloudSchedules && cloudSchedules.length === 0) {
-          // O banco de dados está intencionalmente zerado
-          loadedMap = {};
         } else {
           const cloudCurrentSchedule = await fetchScheduleFromSupabase(currentWeekInfo.weekId);
           if (cloudCurrentSchedule) {
@@ -231,8 +231,6 @@ export default function Home() {
           localStorage.setItem('iloc_schedules_map', JSON.stringify(loadedMap));
           if (loadedMap[currentWeekInfo.weekId]) {
             localStorage.setItem('iloc_schedule', JSON.stringify(loadedMap[currentWeekInfo.weekId]));
-          } else {
-            localStorage.removeItem('iloc_schedule');
           }
         } catch {}
       } catch (err) {
@@ -781,12 +779,14 @@ export default function Home() {
       },
     };
     persistSchedule(updatedSchedule);
+    saveEmployeeToSupabase(newEmp).catch(() => {});
     showToast(`Colaborador ${formatNameAndSurname(newEmp.name)} cadastrado com sucesso.`, 'success');
   };
 
   const handleUpdateEmployee = (updatedEmp: Employee) => {
     const updated = employees.map(e => (e.id === updatedEmp.id ? updatedEmp : e));
     persistEmployees(updated);
+    saveEmployeeToSupabase(updatedEmp).catch(() => {});
     showToast(`Dados de ${updatedEmp.name.split(' ')[0]} atualizados.`, 'success');
   };
 
@@ -799,6 +799,8 @@ export default function Home() {
       return e;
     });
     persistEmployees(updated);
+    const empToSave = updated.find(e => e.id === id);
+    if (empToSave) saveEmployeeToSupabase(empToSave).catch(() => {});
     const emp = employees.find(e => e.id === id);
     const statusLabel = emp?.status === 'active' ? 'inativado' : 'reativado';
     showToast(`Colaborador ${emp?.name.split(' ')[0]} ${statusLabel}.`, 'info');
@@ -808,6 +810,7 @@ export default function Home() {
     const emp = employees.find(e => e.id === id);
     const updatedEmployees = employees.filter(e => e.id !== id);
     persistEmployees(updatedEmployees);
+    deleteEmployeeFromSupabase(id).catch(() => {});
 
     const updatedShifts = { ...schedule.shifts };
     delete updatedShifts[id];

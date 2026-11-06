@@ -103,6 +103,96 @@ export async function authenticateUser(
  * Cadastrar e convidar colaborador
  * Regra: Somente luizstaff@ilocmobile.com.br pode executar
  */
+export async function saveEmployeeToSupabase(
+  employee: Employee,
+  password?: string
+): Promise<{ success: boolean; employee?: Employee; error?: string }> {
+  // 1. Tenta salvar via API do servidor (Service Role)
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employee, password }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.employee) {
+          return { success: true, employee: json.employee };
+        }
+        return { success: false, error: json.error || 'Erro na API de colaboradores.' };
+      }
+    } catch (apiErr: any) {
+      console.warn('Aviso ao salvar via /api/employees, tentando fallback direto:', apiErr);
+    }
+  }
+
+  // 2. Fallback direto ao Supabase (somente colunas existentes na tabela)
+  if (!isSupabaseConfigured() || !supabase) {
+    return { success: true, employee };
+  }
+
+  try {
+    const payload: any = {
+      id: employee.id,
+      name: employee.name,
+      email: (employee.email || '').trim().toLowerCase(),
+      role: employee.role || 'Colaborador',
+      team: employee.team || 'Operações de Loja',
+      work_hours: employee.workHours || '08:00 às 17:00',
+      status: employee.status || 'active',
+    };
+
+    const { data, error } = await supabase
+      .from('employees')
+      .upsert(payload, { onConflict: 'email' })
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.warn('Erro ao salvar colaborador no Supabase:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      employee: data ? { ...employee, id: data.id } : employee,
+    };
+  } catch (err: any) {
+    console.warn('Exceção ao persistir colaborador no Supabase:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteEmployeeFromSupabase(id: string): Promise<{ success: boolean; error?: string }> {
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/employees?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success) return { success: true };
+      }
+    } catch (apiErr) {
+      console.warn('Aviso ao deletar via /api/employees:', apiErr);
+    }
+  }
+
+  if (!isSupabaseConfigured() || !supabase) return { success: true };
+
+  try {
+    const { error } = await supabase.from('employees').delete().eq('id', id);
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 export async function inviteAndRegisterCollaborator({
   name,
   email,
@@ -153,51 +243,12 @@ export async function inviteAndRegisterCollaborator({
     preferredDaysOff: [5, 6],
   };
 
-  // Se o Supabase estiver ativo
-  if (isSupabaseConfigured() && supabase) {
-    try {
-      // 1. Cria usuário de auth no Supabase
-      const { data: authData, error: authErr } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password,
-        options: {
-          data: {
-            name: cleanName,
-            role: 'colaborador',
-            team,
-          },
-        },
-      });
-
-      if (authErr) {
-        return { employee: null, error: authErr.message };
-      }
-
-      if (authData.user) {
-        newEmployee.id = authData.user.id;
-      }
-
-      // 2. Salva na tabela public.employees
-      const { error: dbErr } = await supabase.from('employees').upsert({
-        id: newEmployee.id,
-        name: newEmployee.name,
-        email: cleanEmail,
-        role: newEmployee.role,
-        team: newEmployee.team,
-        work_hours: newEmployee.workHours,
-        work_model: newEmployee.workModel || 'presencial',
-        status: newEmployee.status,
-      });
-
-      if (dbErr) {
-        console.warn('Erro ao salvar no banco Supabase:', dbErr.message);
-      }
-    } catch (err: any) {
-      console.warn('Exceção ao persistir no Supabase:', err);
-    }
+  const saveRes = await saveEmployeeToSupabase(newEmployee, password);
+  if (!saveRes.success) {
+    return { employee: null, error: saveRes.error || 'Erro ao salvar colaborador no banco de dados.' };
   }
 
-  return { employee: newEmployee, error: null };
+  return { employee: saveRes.employee || newEmployee, error: null };
 }
 
 /**
@@ -273,6 +324,22 @@ export async function updateUserProfile({
  * Buscar todos os colaboradores cadastrados no Supabase
  */
 export async function fetchEmployeesFromSupabase(): Promise<Employee[] | null> {
+  // 1. Tenta via API interna do servidor com Service Role
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/employees');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.employees)) {
+          return json.employees;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Aviso ao buscar /api/employees:', apiErr);
+    }
+  }
+
+  // 2. Fallback direto ao Supabase
   if (!isSupabaseConfigured() || !supabase) return null;
 
   try {
