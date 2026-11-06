@@ -52,7 +52,9 @@ interface GerenciarEscalasTabProps {
   onChangeWeekOffset: (delta: number) => void;
   onResetWeekOffset: () => void;
   onSaveDraft: (schedule: WeekSchedule) => void;
-  onPublishSchedule: (schedule: WeekSchedule) => void;
+  onUpdateSchedule?: (schedule: WeekSchedule) => void;
+  isPublishing?: boolean;
+  onPublishSchedule: (schedule: WeekSchedule) => Promise<boolean | void> | void;
   onCopyPreviousWeek: () => void;
   currentUser?: AuthUser | null;
   onPreviewAsColaborador?: () => void;
@@ -140,6 +142,8 @@ export function GerenciarEscalasTab({
   onChangeWeekOffset,
   onResetWeekOffset,
   onSaveDraft,
+  onUpdateSchedule,
+  isPublishing = false,
   onPublishSchedule,
   onCopyPreviousWeek,
   onAddEmployee,
@@ -401,7 +405,11 @@ export function GerenciarEscalasTab({
     if (schedule.isPublished) {
       setIsEditingPublished(true);
     }
-    onSaveDraft(updatedSchedule);
+    if (onUpdateSchedule) {
+      onUpdateSchedule(updatedSchedule);
+    } else {
+      onSaveDraft(updatedSchedule);
+    }
     setQuickEditor(null);
   };
 
@@ -450,7 +458,11 @@ export function GerenciarEscalasTab({
     if (schedule.isPublished) {
       setIsEditingPublished(true);
     }
-    onSaveDraft(updatedSchedule);
+    if (onUpdateSchedule) {
+      onUpdateSchedule(updatedSchedule);
+    } else {
+      onSaveDraft(updatedSchedule);
+    }
   };
 
   // Copiar programação de um dia para o próximo
@@ -478,7 +490,11 @@ export function GerenciarEscalasTab({
       customHours: updatedCustom,
     };
 
-    onSaveDraft(updatedSchedule);
+    if (onUpdateSchedule) {
+      onUpdateSchedule(updatedSchedule);
+    } else {
+      onSaveDraft(updatedSchedule);
+    }
   };
 
   // Abertura do editor semanal completo do colaborador
@@ -558,7 +574,11 @@ export function GerenciarEscalasTab({
     if (schedule.isPublished) {
       setIsEditingPublished(true);
     }
-    onSaveDraft(updatedSchedule);
+    if (onUpdateSchedule) {
+      onUpdateSchedule(updatedSchedule);
+    } else {
+      onSaveDraft(updatedSchedule);
+    }
     setEditingEmployeeWeek(null);
   };
 
@@ -599,7 +619,11 @@ export function GerenciarEscalasTab({
         ...autoShifts,
       },
     };
-    onSaveDraft(updatedSchedule);
+    if (onUpdateSchedule) {
+      onUpdateSchedule(updatedSchedule);
+    } else {
+      onSaveDraft(updatedSchedule);
+    }
   };
 
   const targetQuickEmp = quickEditor
@@ -2009,14 +2033,24 @@ export function GerenciarEscalasTab({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setIsPublishModalOpen(false);
-                  setIsEditingPublished(false);
-                  onPublishSchedule(schedule);
+                disabled={isPublishing}
+                onClick={async () => {
+                  const ok = await onPublishSchedule(schedule);
+                  if (ok !== false) {
+                    setIsPublishModalOpen(false);
+                    setIsEditingPublished(false);
+                  }
                 }}
-                className="flex-1 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs"
+                className="flex-1 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                {schedule.isPublished ? 'Confirmar e Atualizar Escala' : 'Confirmar e Publicar Agora'}
+                {isPublishing ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Publicando...</span>
+                  </>
+                ) : (
+                  <span>{schedule.isPublished ? 'Confirmar e Atualizar Escala' : 'Confirmar e Publicar Agora'}</span>
+                )}
               </button>
             </div>
           </div>

@@ -309,9 +309,100 @@ export async function fetchEmployeesFromSupabase(): Promise<Employee[] | null> {
 }
 
 /**
+ * Normaliza linha bruta do banco Supabase para objeto WeekSchedule
+ */
+export function normalizeScheduleRow(row: any): WeekSchedule {
+  const rawCustom = row.custom_hours || {};
+  let workModels = row.work_models || {};
+
+  const sanitizedCustom: Record<string, (string | undefined)[]> = {};
+  for (const key of Object.keys(rawCustom)) {
+    if (key === '__work_models') {
+      if (!workModels || Object.keys(workModels).length === 0) {
+        workModels = rawCustom.__work_models;
+      }
+    } else {
+      sanitizedCustom[key] = rawCustom[key];
+    }
+  }
+
+  return {
+    weekId: row.week_id,
+    weekNumber: row.week_number,
+    year: row.year,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    isPublished: Boolean(row.is_published),
+    isPublicShareEnabled: Boolean(row.is_public_share_enabled),
+    publishedAt: row.published_at || undefined,
+    shareToken: row.share_token || undefined,
+    shifts: row.shifts || {},
+    customHours: sanitizedCustom,
+    workModels: workModels || {},
+  };
+}
+
+/**
+ * Buscar todas as escalas semanais cadastradas no Supabase
+ */
+export async function fetchAllSchedulesFromSupabase(role: string = 'admin'): Promise<WeekSchedule[]> {
+  // 1. Tenta via API interna do servidor
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/schedules?role=${encodeURIComponent(role)}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.schedules && Array.isArray(json.schedules)) {
+          return json.schedules;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Aviso ao consultar /api/schedules:', apiErr);
+    }
+  }
+
+  // 2. Fallback direto ao cliente Supabase
+  if (!isSupabaseConfigured() || !supabase) return [];
+
+  try {
+    let query = supabase.from('schedules').select('*');
+    if (role === 'colaborador') {
+      query = query.eq('is_published', true);
+    }
+    const { data, error } = await query.order('start_date', { ascending: false });
+
+    if (error || !data) {
+      console.warn('Aviso ao consultar todas as escalas no Supabase:', error?.message);
+      return [];
+    }
+
+    return data.map(normalizeScheduleRow);
+  } catch (err) {
+    console.warn('Exceção ao consultar todas as escalas do Supabase:', err);
+    return [];
+  }
+}
+
+/**
  * Buscar escala semanal específica do Supabase
  */
 export async function fetchScheduleFromSupabase(weekId: string): Promise<WeekSchedule | null> {
+  // 1. Tenta via API interna do servidor
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/schedules?weekId=${encodeURIComponent(weekId)}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.schedule) {
+          return json.schedule;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Aviso ao buscar escala via API:', apiErr);
+    }
+  }
+
+  // 2. Fallback direto ao cliente Supabase
   if (!isSupabaseConfigured() || !supabase) return null;
 
   try {
@@ -323,20 +414,7 @@ export async function fetchScheduleFromSupabase(weekId: string): Promise<WeekSch
 
     if (error || !data) return null;
 
-    return {
-      weekId: data.week_id,
-      weekNumber: data.week_number,
-      year: data.year,
-      startDate: data.start_date,
-      endDate: data.end_date,
-      isPublished: data.is_published,
-      isPublicShareEnabled: data.is_public_share_enabled,
-      publishedAt: data.published_at,
-      shareToken: data.share_token,
-      shifts: data.shifts || {},
-      customHours: data.custom_hours || {},
-      workModels: data.work_models || {},
-    };
+    return normalizeScheduleRow(data);
   } catch (err) {
     console.warn('Exceção ao carregar escala do Supabase:', err);
     return null;
@@ -346,10 +424,39 @@ export async function fetchScheduleFromSupabase(weekId: string): Promise<WeekSch
 /**
  * Salvar ou atualizar escala semanal no Supabase
  */
-export async function saveScheduleToSupabase(schedule: WeekSchedule): Promise<boolean> {
-  if (!isSupabaseConfigured() || !supabase) return false;
+export async function saveScheduleToSupabase(schedule: WeekSchedule): Promise<{ success: boolean; error?: string }> {
+  // 1. Tenta persistência via API interna do servidor com confirmação
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(schedule),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success) {
+          return { success: true };
+        }
+        return { success: false, error: json.error || 'Erro desconhecido na API.' };
+      }
+    } catch (apiErr: any) {
+      console.warn('Aviso ao salvar via /api/schedules, tentando fallback direto:', apiErr);
+    }
+  }
+
+  // 2. Fallback direto ao cliente Supabase (empacotando __work_models com segurança)
+  if (!isSupabaseConfigured() || !supabase) return { success: false, error: 'Supabase não configurado.' };
 
   try {
+    const customHoursPayload = {
+      ...(schedule.customHours || {}),
+      ...(schedule.workModels && Object.keys(schedule.workModels).length > 0
+        ? { __work_models: schedule.workModels }
+        : {}),
+    };
+
     const { error } = await supabase.from('schedules').upsert({
       week_id: schedule.weekId,
       week_number: schedule.weekNumber,
@@ -361,20 +468,64 @@ export async function saveScheduleToSupabase(schedule: WeekSchedule): Promise<bo
       published_at: schedule.publishedAt || (schedule.isPublished ? new Date().toISOString() : null),
       share_token: schedule.shareToken || null,
       shifts: schedule.shifts,
-      custom_hours: schedule.customHours || {},
-      work_models: schedule.workModels || {},
+      custom_hours: customHoursPayload,
       updated_at: new Date().toISOString(),
     });
 
     if (error) {
       console.warn('Erro ao salvar escala no Supabase:', error.message);
-      return false;
+      return { success: false, error: error.message };
     }
-    return true;
-  } catch (err) {
+    return { success: true };
+  } catch (err: any) {
     console.warn('Exceção ao persistir escala no Supabase:', err);
-    return false;
+    return { success: false, error: err.message || 'Falha de conexão.' };
   }
+}
+
+/**
+ * Publicar oficialmente uma escala com validação, persistência e auditoria de confirmação
+ */
+export async function publishScheduleViaApi(
+  schedule: WeekSchedule,
+  adminEmail?: string
+): Promise<{ success: boolean; schedule?: WeekSchedule; error?: string }> {
+  // 1. Tenta via endpoint oficial de publicação
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/schedules/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schedule, adminEmail }),
+      });
+
+      const json = await res.json();
+      if (res.ok && json.success && json.schedule) {
+        return { success: true, schedule: json.schedule };
+      }
+      return { success: false, error: json.error || 'Falha ao confirmar publicação no servidor.' };
+    } catch (apiErr: any) {
+      console.warn('Erro em /api/schedules/publish, tentando fallback:', apiErr);
+    }
+  }
+
+  // 2. Fallback direto ao Supabase com is_published = true
+  const nowIso = new Date().toISOString();
+  const generatedToken = schedule.shareToken || `escala-semana-${schedule.weekNumber}-${Date.now().toString(36)}`;
+  const publishedSchedule: WeekSchedule = {
+    ...schedule,
+    isPublished: true,
+    isPublicShareEnabled: true,
+    shareToken: generatedToken,
+    publishedAt: nowIso,
+  };
+
+  const saveRes = await saveScheduleToSupabase(publishedSchedule);
+  if (!saveRes.success) {
+    return { success: false, error: saveRes.error || 'Erro ao persistir publicação no banco de dados.' };
+  }
+
+  return { success: true, schedule: publishedSchedule };
 }
 
 /**
@@ -421,20 +572,7 @@ export async function fetchPublicScheduleByToken(token: string): Promise<{
       preferredDaysOff: row.preferred_days_off || [5, 6],
     }));
 
-    const formattedSchedule: WeekSchedule = {
-      weekId: schedData.week_id,
-      weekNumber: schedData.week_number,
-      year: schedData.year,
-      startDate: schedData.start_date,
-      endDate: schedData.end_date,
-      isPublished: schedData.is_published,
-      isPublicShareEnabled: schedData.is_public_share_enabled,
-      publishedAt: schedData.published_at,
-      shareToken: schedData.share_token,
-      shifts: schedData.shifts || {},
-      customHours: schedData.custom_hours || {},
-      workModels: schedData.work_models || {},
-    };
+    const formattedSchedule: WeekSchedule = normalizeScheduleRow(schedData);
 
     return { schedule: formattedSchedule, employees: formattedEmps };
   } catch (err) {
@@ -460,7 +598,7 @@ export async function fetchLatestPublishedScheduleFromSupabase(): Promise<{
       .select('*')
       .eq('is_published', true)
       .eq('is_public_share_enabled', true)
-      .order('updated_at', { ascending: false })
+      .order('start_date', { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -488,19 +626,7 @@ export async function fetchLatestPublishedScheduleFromSupabase(): Promise<{
       preferredDaysOff: row.preferred_days_off || [5, 6],
     }));
 
-    const formattedSchedule: WeekSchedule = {
-      weekId: schedData.week_id,
-      weekNumber: schedData.week_number,
-      year: schedData.year,
-      startDate: schedData.start_date,
-      endDate: schedData.end_date,
-      isPublished: schedData.is_published,
-      isPublicShareEnabled: schedData.is_public_share_enabled,
-      publishedAt: schedData.published_at,
-      shareToken: schedData.share_token,
-      shifts: schedData.shifts || {},
-      customHours: schedData.custom_hours || {},
-    };
+    const formattedSchedule: WeekSchedule = normalizeScheduleRow(schedData);
 
     return { schedule: formattedSchedule, employees: formattedEmps };
   } catch (err) {

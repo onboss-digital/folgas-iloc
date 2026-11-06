@@ -31,7 +31,9 @@ interface EscalaTabProps {
   currentUser?: AuthUser | null;
   onCopySuccess?: () => void;
   onSaveDraft?: (schedule: WeekSchedule) => void;
-  onPublishSchedule?: (schedule: WeekSchedule) => void;
+  onUpdateSchedule?: (schedule: WeekSchedule) => void;
+  isPublishing?: boolean;
+  onPublishSchedule?: (schedule: WeekSchedule) => Promise<boolean | void> | void;
   onCopyPreviousWeek?: () => void;
   onDeleteSchedule?: (weekId: string) => void;
   onAddEmployee?: (employee: Omit<Employee, 'id'>) => void;
@@ -58,6 +60,8 @@ export function EscalaTab({
   currentUser,
   onCopySuccess,
   onSaveDraft,
+  onUpdateSchedule,
+  isPublishing,
   onPublishSchedule,
   onCopyPreviousWeek,
   onDeleteSchedule,
@@ -138,6 +142,8 @@ export function EscalaTab({
           onChangeWeekOffset={onChangeWeekOffset}
           onResetWeekOffset={onResetWeekOffset}
           onSaveDraft={onSaveDraft || (() => {})}
+          onUpdateSchedule={onUpdateSchedule}
+          isPublishing={isPublishing}
           onPublishSchedule={onPublishSchedule || (() => {})}
           onCopyPreviousWeek={onCopyPreviousWeek || (() => {})}
           onDeleteSchedule={onDeleteSchedule}

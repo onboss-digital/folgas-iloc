@@ -27,6 +27,8 @@ interface FuncionarioDashboardProps {
   timezonePreference?: 'brasilia' | 'local';
   onOpenSolicitarTroca?: () => void;
   onOpenMinhasTrocas?: () => void;
+  onNavigateToEscala?: () => void;
+  allSchedules?: Record<string, WeekSchedule>;
 }
 
 export function FuncionarioDashboard({
@@ -40,6 +42,8 @@ export function FuncionarioDashboard({
   timezonePreference = 'brasilia',
   onOpenSolicitarTroca,
   onOpenMinhasTrocas,
+  onNavigateToEscala,
+  allSchedules = {},
 }: FuncionarioDashboardProps) {
   // Índice do dia em exibição (começa exatamente no dia de hoje)
   const [viewingDayIdx, setViewingDayIdx] = useState<number>(() => {
@@ -128,19 +132,31 @@ export function FuncionarioDashboard({
     return `${formatDayTitle(day.name)}, ${dayNumber} de ${monthName}`;
   };
 
-  // Se a escala não estiver publicada
+  // Se a escala da semana não estiver homologada e publicada
   if (!schedule.isPublished) {
+    const publishedList = Object.values(allSchedules).filter(s => s && s.isPublished);
     return (
-      <div className="w-full p-6 rounded-2xl bg-white border border-slate-200/90 shadow-xs text-center flex flex-col items-center gap-3">
+      <div className="w-full p-6 sm:p-8 rounded-2xl bg-white border border-slate-200/90 shadow-xs text-center flex flex-col items-center gap-3">
         <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
           <AlertCircle className="w-6 h-6 text-amber-600" />
         </div>
-        <h2 className="text-sm font-bold text-slate-900">
-          Nenhuma Escala Publicada
+        <h2 className="text-base font-black text-slate-900">
+          Escala em Organização
         </h2>
-        <p className="text-xs text-slate-500 leading-relaxed">
-          A escala deste período ainda não foi homologada pelo administrador. Assim que for publicada, os turnos e folgas aparecerão aqui.
+        <p className="text-xs text-slate-600 max-w-md leading-relaxed">
+          {publishedList.length > 0
+            ? 'A escala deste período específico está sendo ajustada pelo administrador. Você pode consultar as demais escalas da equipe no quadro geral.'
+            : 'A programação desta semana ainda está sendo organizada pelo administrador. Assim que for publicada, todas as folgas e turnos da equipe estarão disponíveis aqui.'}
         </p>
+        {onNavigateToEscala && (
+          <button
+            type="button"
+            onClick={onNavigateToEscala}
+            className="mt-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-xs"
+          >
+            Ver Quadro de Escalas da Equipe
+          </button>
+        )}
       </div>
     );
   }
@@ -525,9 +541,25 @@ export function FuncionarioDashboard({
                     <span className="text-sm font-bold text-slate-900 truncate">
                       {formatNameAndSurname(emp.name)}
                     </span>
-                    <span className="text-xs text-slate-500 truncate">
-                      {emp.role}
-                    </span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-slate-500 truncate">
+                        {emp.role}
+                      </span>
+                      {(() => {
+                        const empModel = schedule.workModels?.[emp.id]?.[viewingDayIdx] || emp.workModel || 'presencial';
+                        return (
+                          <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md ${
+                            empModel === 'home_office'
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : empModel === 'hibrido'
+                              ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                              : 'bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}>
+                            {empModel === 'home_office' ? 'Home office' : empModel === 'hibrido' ? 'Híbrido' : 'Presencial'}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
 
